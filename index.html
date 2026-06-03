@@ -1202,12 +1202,10 @@ input[type=file] { display: none; }
   </div>
 </div>
 <script>
-// Remove static fallback once real JS login screen is built
+// Remove static fallback immediately — JS handles auth screen rendering
 window.addEventListener('DOMContentLoaded', function() {
-  setTimeout(function() {
-    var f = document.getElementById('static-login-fallback');
-    if(f && document.getElementById('login-screen')) f.remove();
-  }, 500);
+  var f = document.getElementById('static-login-fallback');
+  if(f) f.remove();
 });
 </script>
 
