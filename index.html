@@ -1193,37 +1193,29 @@ input[type=file] { display: none; }
 
 </head>
 <body>
-<div id="static-login-fallback" style="display:none!important;">
+<div id="static-login-fallback" style="position:fixed;inset:0;background:linear-gradient(150deg,#001A40 0%,#002868 45%,#B22234 100%);display:flex;align-items:center;justify-content:center;z-index:88888;font-family:sans-serif;">
   <div style="width:420px;background:#fff;border-radius:20px;padding:44px;box-shadow:0 32px 80px rgba(0,0,0,0.5);text-align:center;">
-    <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="height:60px;width:auto;margin:0 auto 16px;display:block;border-radius:8px;" alt="Cox Roofing"/>
+    <div style="width:64px;height:64px;background:linear-gradient(135deg,#002868,#B22234);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px;">&#x1F3E0;</div>
     <div style="font-size:26px;font-weight:900;color:#001A40;margin-bottom:5px;">ClaimDesk</div>
     <div style="font-size:13px;color:#64748B;margin-bottom:24px;">Roofing Supplement &amp; Claims Intelligence</div>
     <div style="font-size:13px;color:#475569;padding:16px;background:#F1F5F9;border-radius:10px;">Loading ClaimDesk... if this persists please refresh.</div>
   </div>
 </div>
 <script>
-// Kill the loading fallback immediately — never let it block
-(function() {
-  function killFallback() {
+// Remove static fallback once real JS login screen is built
+window.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
     var f = document.getElementById('static-login-fallback');
-    if (f) { f.style.display = 'none'; f.remove(); }
-  }
-  // Kill on DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', killFallback);
-  } else {
-    killFallback();
-  }
-  // Kill again after 100ms just in case
-  setTimeout(killFallback, 100);
-})();
+    if(f && document.getElementById('login-screen')) f.remove();
+  }, 500);
+});
 </script>
 
 
 <!-- SIDEBAR -->
 <div id="sidebar" style="display:none;">
   <div class="logo">
-    <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" alt="Cox"/>
+    <div class="logo-icon">&#x1F3E0;</div>
     <div>
       <div class="logo-text">ClaimDesk</div>
       <div class="logo-sub">Cox Roofing</div>
@@ -1322,8 +1314,6 @@ function clearSession(){localStorage.removeItem('claimdesk_session');state.user=
 function getPlanBadge(plan){const b={trial:'<span style="background:#374151;color:#9ca3af;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">TRIAL</span>',pay_per_estimate:'<span style="background:#1d4ed8;color:#bfdbfe;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">PAY/EST</span>',starter:'<span style="background:#065f46;color:#6ee7b7;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">STARTER</span>',pro:'<span style="background:#1e40af;color:#bfdbfe;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">PRO</span>',elite:'<span style="background:#7c3aed;color:#ddd6fe;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600">ELITE</span>'};return b[plan]||b.trial;}
 
 function buildLoginScreen(mode){
-  // Always remove loading fallback
-  const fb=document.getElementById('static-login-fallback');if(fb)fb.remove();
   const isReset = mode === 'reset';
   const existing = document.getElementById('login-screen');
   if(existing) existing.remove();
@@ -1337,7 +1327,7 @@ function buildLoginScreen(mode){
 
     <!-- LOGO -->
     <div style="text-align:center;margin-bottom:28px;">
-      <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="height:64px;width:auto;margin:0 auto 14px;display:block;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.25);" alt="Cox Roofing"/>
+      <div style="width:64px;height:64px;background:linear-gradient(135deg,#002868 0%,#B22234 100%);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);">&#x1F3E0;</div>
       <div style="font-size:26px;font-weight:900;color:#001A40;margin-bottom:4px;letter-spacing:-0.03em;">ClaimDesk</div>
       <div style="font-size:13px;color:#64748B;font-weight:500;">Roofing Supplement &amp; Claims Intelligence</div>
       <div style="height:3px;background:linear-gradient(90deg,#B22234,#FFFFFF 50%,#002868);border-radius:2px;margin:12px auto 0;width:80px;"></div>
@@ -1463,7 +1453,7 @@ function buildInviteScreen(token, companyName, mode){
   <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#B22234 0%,#B22234 33.3%,#FFFFFF 33.3%,#FFFFFF 66.6%,#002868 66.6%,#002868 100%);"></div>
   <div style="width:460px;background:#FFFFFF;border-radius:20px;padding:44px;box-shadow:0 32px 80px rgba(0,0,0,0.40);position:relative;z-index:1;">
     <div style="text-align:center;margin-bottom:28px;">
-      <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="height:56px;width:auto;margin:0 auto 14px;display:block;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.20);" alt="Cox Roofing"/>
+      <div style="width:64px;height:64px;background:linear-gradient(135deg,#15803D,#14532D);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 14px;">${mode==='reset'?'&#x1F512;':'&#x1F91D;'}</div>
       <div style="font-size:22px;font-weight:900;color:#001A40;margin-bottom:4px;letter-spacing:-0.03em;">${mode==='reset'?'Reset Your Password':'You\'re invited!'}</div>
       <div style="font-size:13px;color:#64748B;">${mode==='reset'?'Create a new password for your ClaimDesk account':'Set up your ClaimDesk account for <strong>'+(companyName||'Cox Roofing')+'</strong>'}</div>
     </div>
@@ -1585,7 +1575,6 @@ async function doLogin(){
     if(r.success){
       saveSession(r.user,r.company);
       document.getElementById('login-screen').remove();
-      const fb2=document.getElementById('static-login-fallback');if(fb2)fb2.remove();
       document.getElementById('sidebar').style.display='flex';
       document.getElementById('main').style.display='flex';
       updateSidebarUser();
@@ -1654,7 +1643,7 @@ function updateSidebarUser(){
 
 function showUserMenu(){
   const u=state.user,c=state.company;
-  const isFounder=u?.email==='austin@coxroof.com'||u?.email==='cait@coxroof.com'||u?.email==='austin.ihde15@gmail.com';
+  const isFounder=u?.email==='austin@coxroof.com'||u?.email==='cait@coxroof.com';
   openModal('Account',`
     <div style="padding:4px 0;">
       <div style="margin-bottom:14px;padding:12px;background:var(--navy3);border-radius:8px;">
@@ -1812,7 +1801,6 @@ async function init(){
     if(session&&session.user&&session.company){
       state.user=session.user;
       state.company=session.company;
-      const fb2=document.getElementById('static-login-fallback');if(fb2)fb2.remove();
       document.getElementById('sidebar').style.display='flex';
       document.getElementById('main').style.display='flex';
       updateSidebarUser();
@@ -3454,14 +3442,7 @@ function showTutorialModal() {
     }
   });
 }
-(async () => {
-  try {
-    await init();
-  } catch(e) {
-    console.error("Init failed:", e);
-    buildLoginScreen();
-  }
-})();
+try { init(); } catch(e) { console.error("Init failed:", e); buildLoginScreen(); }
 </script>
 <script>
 // ===========================================================
