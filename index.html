@@ -1302,7 +1302,7 @@ input[type=file] { display: none; }
 //  STATE
 // ===========================================================
 const APP_ID = '6a0ec85f9e963ce8edb7126c';
-const BASE_URL = `https://api.base44.com/apps/${APP_ID}`;
+const BASE_URL = `https://v-edb7126c.base44.app`;
 let state = {
   page: 'dashboard',
   claims: [],
@@ -5013,7 +5013,7 @@ async function randySend(){
   const user = window.currentUser || 'ClaimDesk User';
   try{
     const APP_ID='6a0ec85f9e963ce8edb7126c';
-    const res=await fetch('https://api.base44.com/apps/'+APP_ID+'/functions/randyGateway',{
+    const res=await fetch('https://v-edb7126c.base44.app/functions/randyGateway',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({task,claim,user})
