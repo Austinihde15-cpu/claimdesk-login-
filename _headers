@@ -3,7 +3,9 @@
   Pragma: no-cache
   Expires: 0
   X-Content-Type-Options: nosniff
+  Access-Control-Allow-Origin: https://myelitetrack.com
+  Access-Control-Allow-Methods: GET, POST, OPTIONS
+  Access-Control-Allow-Headers: Content-Type
 
 /*.html
   Content-Type: text/html; charset=utf-8
-  Cache-Control: no-cache, no-store, must-revalidate
