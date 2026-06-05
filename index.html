@@ -8040,31 +8040,83 @@ function getStatusOptions(selected) {
 
 
 function showInvitePanel(token){
-  // Show the login card if not already visible
-  if(!document.getElementById('login-screen')) buildLoginScreen();
-  document.getElementById('panel-signin').style.display='none';
-  document.getElementById('panel-forgot').style.display='none';
-  document.getElementById('panel-signup').style.display='none';
-  document.getElementById('panel-invite').style.display='block';
-  document.getElementById('panel-invite-loading').style.display='block';
-  document.getElementById('panel-invite-form').style.display='none';
-  document.getElementById('panel-invite-error').style.display='none';
-  window._invitePanelToken = token;
-  // Verify the token
-  callFunction('verifyInvite', { token }).then(r => {
-    document.getElementById('panel-invite-loading').style.display='none';
+  // Remove any existing screens
+  ['login-screen','invite-screen'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
+  // Build a completely standalone invite activation screen
+  const d = document.createElement('div');
+  d.id = 'invite-screen';
+  d.style.cssText = 'position:fixed;inset:0;background:linear-gradient(150deg,#001A40 0%,#002868 45%,#B22234 100%);display:flex;align-items:center;justify-content:center;z-index:999999;overflow:hidden;font-family:Inter,sans-serif;';
+  d.innerHTML = `
+  <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#B22234 0%,#B22234 33.3%,#FFFFFF 33.3%,#FFFFFF 66.6%,#002868 66.6%,#002868 100%);"></div>
+  <div style="width:460px;background:#FFFFFF;border-radius:20px;padding:44px;box-shadow:0 32px 80px rgba(0,0,0,0.40);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="height:60px;width:auto;margin:0 auto 12px;display:block;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.20);" alt="Cox Roofing"/>
+      <div style="font-size:24px;font-weight:900;color:#001A40;margin-bottom:4px;letter-spacing:-0.03em;">ClaimDesk</div>
+      <div style="font-size:13px;color:#64748B;font-weight:500;">You have been invited to join ClaimDesk</div>
+      <div style="height:3px;background:linear-gradient(90deg,#B22234,#FFFFFF 50%,#002868);border-radius:2px;margin:10px auto 0;width:80px;"></div>
+    </div>
+    <div id="is-loading" style="text-align:center;padding:24px 0;color:#64748B;">
+      <div style="width:28px;height:28px;border:3px solid #1345A8;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;"></div>
+      Verifying your invite link...
+    </div>
+    <div id="is-form" style="display:none;">
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:11px 14px;margin-bottom:20px;font-size:12px;color:#1345A8;font-weight:600;text-align:center;">
+        &#x2705; Invite verified &mdash; create your account below
+      </div>
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Your Name</label>
+      <input id="is-name" type="text" placeholder="Full Name" autocomplete="name"
+        style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#1345A8';this.style.boxShadow='0 0 0 3px rgba(19,69,168,.10)'"
+        onblur="this.style.borderColor='#E2E8F0';this.style.boxShadow='none'">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Email Address</label>
+      <input id="is-email" type="email" readonly
+        style="width:100%;padding:12px 14px;background:#F1F5F9;border:1.5px solid #E2E8F0;border-radius:9px;color:#64748B;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;cursor:not-allowed;box-sizing:border-box;">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Choose Password</label>
+      <input id="is-pass" type="password" placeholder="Choose a password (min 6 characters)" autocomplete="new-password"
+        style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#1345A8';this.style.boxShadow='0 0 0 3px rgba(19,69,168,.10)'"
+        onblur="this.style.borderColor='#E2E8F0';this.style.boxShadow='none'">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Confirm Password</label>
+      <input id="is-confirm" type="password" placeholder="Confirm your password" autocomplete="new-password"
+        style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:20px;font-family:inherit;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#1345A8';this.style.boxShadow='0 0 0 3px rgba(19,69,168,.10)'"
+        onblur="this.style.borderColor='#E2E8F0';this.style.boxShadow='none'">
+      <button onclick="submitInviteScreen()" id="is-btn"
+        style="width:100%;padding:14px;background:linear-gradient(135deg,#15803D,#14532D);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(21,128,61,0.30);font-family:inherit;letter-spacing:.01em;margin-bottom:4px;">
+        Create Account &#x2192;
+      </button>
+      <div id="is-msg" style="font-size:13px;text-align:center;margin-top:10px;min-height:18px;font-weight:600;color:#B22234;"></div>
+    </div>
+    <div id="is-error" style="display:none;text-align:center;padding:16px 0;">
+      <div style="font-size:40px;margin-bottom:10px;">&#x274C;</div>
+      <div style="font-weight:800;color:#B22234;font-size:16px;margin-bottom:8px;">Invalid or Expired Invite</div>
+      <div style="font-size:13px;color:#64748B;margin-bottom:20px;">This invite link has already been used or has expired. Contact your admin for a new link.</div>
+      <button onclick="document.getElementById('invite-screen').remove();buildLoginScreen();"
+        style="padding:11px 28px;background:linear-gradient(135deg,#1345A8,#002868);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+        Back to Sign In
+      </button>
+    </div>
+  </div>`;
+  document.body.appendChild(d);
+  window._isToken = token;
+  // Verify token
+  callFunction('verifyInvite', {token}).then(r => {
+    document.getElementById('is-loading').style.display = 'none';
     if(r.ok && r.user){
-      document.getElementById('inv2-email').value = r.user.email || '';
-      document.getElementById('inv2-name').value  = r.user.full_name || '';
-      window._invitePanelUserId = r.user.id;
-      document.getElementById('panel-invite-form').style.display='block';
-      setTimeout(()=>{ const n=document.getElementById('inv2-name'); if(n&&!n.value) n.focus(); else document.getElementById('inv2-pass').focus(); }, 100);
+      document.getElementById('is-email').value = r.user.email || '';
+      document.getElementById('is-name').value  = r.user.full_name || '';
+      window._isUserId = r.user.id;
+      document.getElementById('is-form').style.display = 'block';
+      setTimeout(()=>{
+        const n = document.getElementById('is-name');
+        if(n && !n.value) n.focus(); else document.getElementById('is-pass').focus();
+      }, 150);
     } else {
-      document.getElementById('panel-invite-error').style.display='block';
+      document.getElementById('is-error').style.display = 'block';
     }
   }).catch(()=>{
-    document.getElementById('panel-invite-loading').style.display='none';
-    document.getElementById('panel-invite-error').style.display='block';
+    document.getElementById('is-loading').style.display = 'none';
+    document.getElementById('is-error').style.display = 'block';
   });
 }
 
