@@ -2471,6 +2471,7 @@ function renderClaimDetail(data) {
       <div class="tab active" onclick="switchTab('documents')">&#x1F4C1; Vault</div>
       <div class="tab" onclick="switchTab('emails')">Emails (${threads.length})</div>
       <div class="tab" onclick="switchTab('analysis')">Analysis (${analyses.length})</div>
+      <div class="tab" onclick="switchTab('activity')">&#x1F4CB; Activity</div>
       ${denials.length ? `<div class="tab" onclick="switchTab('denials')">Denials (${denials.length})</div>` : ''}
     </div>
 
@@ -2492,6 +2493,15 @@ function switchTab(tab) {
   else if (tab === 'documents') {
     content.innerHTML = renderDocsTab(d.attachments||[], c.id);
     setTimeout(() => loadDocVault(c.id), 50);
+  }
+  else if (tab === 'activity') {
+    const jnJobId = c.jobnimbus_id || '';
+    content.innerHTML = `<div class="card"><div class="card-header"><div class="card-title">&#x1F4CB; Activity Feed</div></div><div class="card-body"><div id="activity-feed-container"></div></div></div>`;
+    if (jnJobId) {
+      loadJobActivity(jnJobId, 'activity-feed-container');
+    } else {
+      document.getElementById('activity-feed-container').innerHTML = '<div class="activity-empty">&#x26A0; No JobNimbus ID linked to this claim. Add a <code>jobnimbus_id</code> to enable the activity feed.</div>';
+    }
   }
   else if (tab === 'emails') content.innerHTML = renderEmailsTab(d.threads||[]);
   else if (tab === 'analysis') content.innerHTML = renderAnalysisTab(d.analyses||[]);
@@ -5556,7 +5566,49 @@ function exportPhotoReport() {
     color:${doneReq===totalReq?'#86efac':'#fca5a5'};border-bottom:2px solid ${doneReq===totalReq?'#166534':'#dc2626'}}
   table{width:calc(100% - 72px);margin:20px 36px;border-collapse:collapse}
   th{background:#0f1c2e;color:#fff;padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;text-align:left}
-  @media print{body{margin:0}}</style></head><body>
+  @media print{body{margin:0}}
+/* ── Activity Feed ──────────────────────────────────────── */
+.activity-feed-wrap { padding: 4px 0; }
+.activity-feed-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 0 14px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+}
+.activity-timeline { position: relative; }
+.activity-item { display: flex; gap: 14px; position: relative; }
+.activity-item.last .activity-body { padding-bottom: 0; }
+.activity-dot-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.activity-dot {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; z-index: 1;
+}
+.activity-line { width: 2px; background: var(--border); flex: 1; min-height: 18px; margin: 2px 0; }
+.activity-body { flex: 1; padding-bottom: 18px; min-width: 0; }
+.activity-row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+.activity-type { font-weight: 700; font-size: 13px; }
+.activity-who {
+  font-size: 11px; color: var(--text2);
+  background: var(--surface2); padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+}
+.activity-time { font-size: 11px; color: var(--text2); margin-left: auto; white-space: nowrap; }
+.activity-note {
+  font-size: 12.5px; color: var(--text1); white-space: pre-wrap;
+  word-break: break-word; background: var(--surface2);
+  border-radius: 8px; padding: 8px 12px; margin-top: 4px;
+  border-left: 3px solid var(--border); max-height: 200px; overflow-y: auto; line-height: 1.5;
+}
+.activity-loading, .activity-empty, .activity-error {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text2); font-size: 13px; padding: 24px 0;
+}
+.see-more { color: var(--primary); cursor: pointer; font-size: 12px; margin-left: 4px; }
+.spinner-sm {
+  width: 16px; height: 16px; border: 2px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin 0.7s linear infinite; flex-shrink: 0;
+}
+
+</style></head><body>
   <div class="hdr">
     <div class="co">Cox Roofing & Restoration</div>
     <div style="margin-top:4px;font-size:22px;font-weight:800">CREW PHOTO CHECKLIST REPORT</div>
@@ -7719,6 +7771,168 @@ function switchDocTab(tab) {
   if(tab==='workorder'){
     const inner=document.getElementById('wo-panel-inner');
     if(inner&&!inner._built){inner.innerHTML=buildWOPanel();inner._built=true;window._woLines=window._woLines||[];renderWOLines();}
+  }
+}
+
+
+
+// ============================================================
+// ACTIVITY FEED — JN-style timeline for each claim/job
+// ============================================================
+const _JN_KEY = 'mpff324muku81lq3';
+const _JN_BASE = 'https://app.jobnimbus.com/api1';
+
+const ACTIVITY_ICONS = {
+  'Job Created':         { icon: '&#x2795;',     color: '#22c55e', bg: '#dcfce7' },
+  'Assigned Job':        { icon: '&#x1F464;',    color: '#3b82f6', bg: '#dbeafe' },
+  'Related to job':      { icon: '&#x1F517;',    color: '#8b5cf6', bg: '#ede9fe' },
+  'Status Changed':      { icon: '&#x1F504;',    color: '#f59e0b', bg: '#fef3c7' },
+  'Job Modified':        { icon: '&#x270F;',     color: '#6366f1', bg: '#e0e7ff' },
+  'Note':                { icon: '&#x1F4DD;',    color: '#0ea5e9', bg: '#e0f2fe' },
+  'Work Order Modified': { icon: '&#x1F528;',    color: '#f97316', bg: '#ffedd5' },
+  'Work Order Created':  { icon: '&#x1F4CB;',    color: '#10b981', bg: '#d1fae5' },
+  'Estimate Created':    { icon: '&#x1F4B0;',    color: '#10b981', bg: '#d1fae5' },
+  'Estimate Modified':   { icon: '&#x1F4B0;',    color: '#f59e0b', bg: '#fef3c7' },
+  'Email':               { icon: '&#x2709;',     color: '#6366f1', bg: '#e0e7ff' },
+  'Call':                { icon: '&#x1F4DE;',    color: '#22c55e', bg: '#dcfce7' },
+  'default':             { icon: '&#x23F1;',     color: '#94a3b8', bg: '#f1f5f9' },
+};
+
+function _getActMeta(t) { return ACTIVITY_ICONS[t] || ACTIVITY_ICONS['default']; }
+
+function _fmtActNote(note, type) {
+  if (!note || note === '<no content provided>') return '';
+  note = note.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+  if (type === 'Status Changed') note = note.replace('Job Updated\n','').replace(/=>/g,'→').trim();
+  if (type === 'Job Modified')   note = note.replace('Job Updated\n','').trim();
+  return note.trim();
+}
+
+function _fmtActTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000), now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60)    return 'just now';
+  if (diff < 3600)  return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) +
+    ' \u00B7 ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+async function loadJobActivity(jobJnid, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '<div class="activity-loading"><div class="spinner-sm"></div><span>Loading activity from JobNimbus...</span></div>';
+
+  try {
+    const r1 = await fetch(`${_JN_BASE}/activities?related=${jobJnid}&limit=100&fields=jnid,date_created`, {
+      headers: { 'Authorization': `Bearer ${_JN_KEY}` }
+    });
+    const d1 = await r1.json();
+    const items = (d1.activity || d1.results || []).slice(0, 60);
+
+    if (!items.length) {
+      el.innerHTML = '<div class="activity-empty">&#x1F4AD; No activity recorded yet for this job.</div>';
+      return;
+    }
+
+    // Fetch all individually (JN API quirk — list returns jnids only)
+    const acts = await Promise.all(items.map(async item => {
+      try {
+        const r = await fetch(`${_JN_BASE}/activities/${item.jnid}`, {
+          headers: { 'Authorization': `Bearer ${_JN_KEY}` }
+        });
+        return await r.json();
+      } catch { return null; }
+    }));
+
+    const valid = acts.filter(Boolean).sort((a,b) => (b.date_created||0) - (a.date_created||0));
+
+    el.innerHTML = `
+      <div class="activity-feed-wrap">
+        <div class="activity-feed-header">
+          <span style="font-weight:700;font-size:14px">&#x1F4CB; Activity Feed</span>
+          <span style="color:var(--text2);font-size:12px;background:var(--surface2);padding:2px 8px;border-radius:10px">${valid.length} events</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="showAddNoteModal('${jobJnid}','${containerId}')">&#x2B; Add Note</button>
+        </div>
+        <div class="activity-timeline">
+          ${valid.map((act, i) => {
+            const meta  = _getActMeta(act.record_type_name || '');
+            const note  = _fmtActNote(act.note || '', act.record_type_name || '');
+            const time  = _fmtActTime(act.date_created);
+            const who   = act.created_by_name || 'System';
+            const type  = act.record_type_name || 'Activity';
+            const fullTime = new Date((act.date_created||0)*1000).toLocaleString();
+            const isLast = i === valid.length - 1;
+            const shortNote = note.length > 350 ? note.slice(0, 350) : note;
+            const hasMore = note.length > 350;
+
+            return `
+              <div class="activity-item${isLast ? ' last' : ''}">
+                <div class="activity-dot-wrap">
+                  <div class="activity-dot" style="background:${meta.bg};border:2px solid ${meta.color}">
+                    <span style="color:${meta.color};font-size:13px">${meta.icon}</span>
+                  </div>
+                  ${!isLast ? '<div class="activity-line"></div>' : ''}
+                </div>
+                <div class="activity-body">
+                  <div class="activity-row1">
+                    <span class="activity-type" style="color:${meta.color}">${type}</span>
+                    <span class="activity-who">${who}</span>
+                    <span class="activity-time" title="${fullTime}">${time}</span>
+                  </div>
+                  ${note ? `<div class="activity-note" id="anote-${i}">${shortNote}${hasMore ? `<span class="see-more" onclick="document.getElementById('anote-${i}').textContent='${note.replace(/'/g,"\\'").replace(/\n/g,'\\n')}'">... see more</span>` : ''}</div>` : ''}
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+
+  } catch(e) {
+    el.innerHTML = `<div class="activity-error">&#x26A0; Could not load activity: ${e.message}</div>`;
+  }
+}
+
+function showAddNoteModal(jobJnid, containerId) {
+  const existing = document.getElementById('_add-note-modal');
+  if (existing) existing.remove();
+  const m = document.createElement('div');
+  m.id = '_add-note-modal';
+  m.className = 'modal-overlay active';
+  m.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <span class="modal-title">&#x1F4DD; Add Note to JobNimbus</span>
+        <button class="modal-close" onclick="document.getElementById('_add-note-modal').remove()">&#x2715;</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="_new-note-text" class="form-input" rows="5" placeholder="Type your note..." style="resize:vertical"></textarea>
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="document.getElementById('_add-note-modal').remove()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitJobNote('${jobJnid}','${containerId}')">Save to JN</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  setTimeout(() => document.getElementById('_new-note-text')?.focus(), 100);
+}
+
+async function submitJobNote(jobJnid, containerId) {
+  const text = (document.getElementById('_new-note-text')?.value || '').trim();
+  if (!text) { showToast('Note cannot be empty.', 'error'); return; }
+  try {
+    const r = await fetch(`${_JN_BASE}/activities`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${_JN_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type:'activity', note: text, related: [{ id: jobJnid, type:'job' }] })
+    });
+    if (!r.ok) throw new Error('JN error ' + r.status);
+    document.getElementById('_add-note-modal')?.remove();
+    showToast('Note saved to JobNimbus ✓', 'success');
+    setTimeout(() => loadJobActivity(jobJnid, containerId), 600);
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'error');
   }
 }
 
