@@ -4707,7 +4707,7 @@ const PHOTO_CHECKLISTS = {
     description: "Standard full tear-off and reroof -- all photos required before crew pay is released.",
     sections: [
       {
-        id: "pre_work",
+        id: "pre_work", role: "salesman",
         title: "PRE-WORK -- Before Tear-Off",
         color: "#1e6fff",
         required: true,
@@ -4730,7 +4730,7 @@ const PHOTO_CHECKLISTS = {
         ]
       },
       {
-        id: "tear_off",
+        id: "tear_off", role: "crew_lead",
         title: "DURING TEAR-OFF",
         color: "#f97316",
         required: true,
@@ -4751,7 +4751,7 @@ const PHOTO_CHECKLISTS = {
         ]
       },
       {
-        id: "installation",
+        id: "installation", role: "crew_lead",
         title: "INSTALLATION -- In Progress",
         color: "#22c55e",
         required: true,
@@ -4775,7 +4775,7 @@ const PHOTO_CHECKLISTS = {
         ]
       },
       {
-        id: "completion",
+        id: "completion", role: "salesman",
         title: "COMPLETION -- Final Inspection Photos",
         color: "#a855f7",
         required: true,
@@ -4920,6 +4920,7 @@ let pcState = {
   address: '',
   photos: {},       // { item_id: { file, dataUrl, note, ts } }
   submitted: false,
+  role: 'all',      // 'all' | 'salesman' | 'crew_lead'
 };
 
 // -------------------------------------------------------------
@@ -5010,6 +5011,34 @@ function renderPhotoChecklistPage() {
     <button class="btn btn-primary" onclick="exportPhotoReport()">&#x1F4C4; Export Report</button>
   </div>
 
+  <!-- ROLE SWITCHER -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+    <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Viewing As:</div>
+    <div style="display:flex;gap:8px;background:var(--navy3);border:1px solid var(--border);border-radius:10px;padding:4px;">
+      <button id="role-btn-all" onclick="setPCRole('all')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff;transition:all .15s;">
+        👁 All Phases
+      </button>
+      <button id="role-btn-salesman" onclick="setPCRole('salesman')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .15s;">
+        🤝 My Photos (Salesman)
+      </button>
+      <button id="role-btn-crew_lead" onclick="setPCRole('crew_lead')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .15s;">
+        🔨 Crew Lead Photos
+      </button>
+    </div>
+  </div>
+
+  <!-- SALESMAN BANNER (shows when in salesman mode) -->
+  <div id="salesman-banner" style="display:none;background:linear-gradient(135deg,#0e4d2e,#166534);border:1px solid #16a34a;border-radius:10px;padding:14px 20px;margin-bottom:18px;display:none;">
+    <div style="font-size:14px;font-weight:800;color:#4ade80;margin-bottom:4px;">📸 Salesman Photo Mode</div>
+    <div style="font-size:12px;color:#86efac;">Your two responsibilities: <strong>Pre-Work (before tear-off)</strong> and <strong>Completion / Final Inspection</strong>. Each upload is automatically labeled with your name and timestamp.</div>
+  </div>
+
+  <!-- CREW BANNER (shows when in crew lead mode) -->
+  <div id="crew-banner" style="display:none;background:linear-gradient(135deg,#431407,#7c2d12);border:1px solid #ea580c;border-radius:10px;padding:14px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#fb923c;margin-bottom:4px;">🔨 Crew Lead Photo Mode</div>
+    <div style="font-size:12px;color:#fdba74;">Your two responsibilities: <strong>During Tear-Off</strong> and <strong>Installation in Progress</strong>. These photos document your work and are required before pay is released.</div>
+  </div>
+
   <!-- Job Type Selector -->
   <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Job Type</div>
   <div class="type-selector" id="pc-type-selector">
@@ -5082,25 +5111,64 @@ function renderPCChecklist() {
   const body = document.getElementById('pc-checklist-body');
   if (!body) return;
 
-  body.innerHTML = checklist.sections.map(section => `
-    <div class="pc-section">
+  // Filter sections by role
+  const visibleSections = pcState.role === 'all'
+    ? checklist.sections
+    : checklist.sections.filter(s => s.role === pcState.role);
+
+  const ROLE_LABELS = {
+    salesman: { label: '🤝 SALESMAN', bg: '#15803d', text: '#4ade80' },
+    crew_lead: { label: '🔨 CREW LEAD', bg: '#c2410c', text: '#fb923c' },
+  };
+
+  body.innerHTML = visibleSections.map(section => {
+    const roleTag = ROLE_LABELS[section.role];
+    const roleBadge = roleTag
+      ? `<span style="font-size:10px;font-weight:800;padding:2px 9px;border-radius:10px;background:${roleTag.bg};color:${roleTag.text};margin-left:8px;white-space:nowrap;">${roleTag.label}</span>`
+      : '';
+    return `
+    <div class="pc-section" data-role="${section.role||'all'}">
       <div class="pc-section-hdr" style="background:${section.color}22;border:1px solid ${section.color}44;border-bottom:none">
         <div style="width:10px;height:10px;border-radius:50%;background:${section.color};flex-shrink:0"></div>
         <div class="pc-section-title" style="color:${section.color}">${section.title}</div>
+        ${roleBadge}
         <div class="pc-section-count" style="background:${section.color}33;color:${section.color}" id="count-${section.id}">
           ${countSectionDone(section.id, section.items)} / ${section.items.length}
         </div>
         <div style="flex:1"></div>
         <div class="pc-progress-bar-wrap" style="flex:0 0 100px">
-          <div class="pc-progress-bar" id="bar-${section.id}" 
+          <div class="pc-progress-bar" id="bar-${section.id}"
                style="width:${Math.round(countSectionDone(section.id,section.items)/section.items.length*100)}%;background:${section.color}"></div>
         </div>
       </div>
       <div class="pc-items">
         ${section.items.map(item => renderPCItem(item, section)).join('')}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+function setPCRole(role) {
+  pcState.role = role;
+  // Update toggle button styles
+  ['all','salesman','crew_lead'].forEach(r => {
+    const btn = document.getElementById('role-btn-' + r);
+    if (!btn) return;
+    if (r === role) {
+      btn.style.background = r === 'salesman' ? '#15803d' : r === 'crew_lead' ? '#c2410c' : 'var(--blue)';
+      btn.style.color = '#fff';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text2)';
+    }
+  });
+  // Show/hide banners
+  const sb = document.getElementById('salesman-banner');
+  const cb = document.getElementById('crew-banner');
+  if (sb) sb.style.display = role === 'salesman' ? 'block' : 'none';
+  if (cb) cb.style.display = role === 'crew_lead' ? 'block' : 'none';
+  renderPCChecklist();
+  updatePCSummary();
 }
 
 function renderPCItem(item, section) {
@@ -5137,7 +5205,9 @@ function renderPCItem(item, section) {
               <div style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:#15803D;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid #fff">&#10003;</div>
             </div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:11px;font-weight:700;color:#15803D;margin-bottom:3px">&#9989; Photo captured</div>
+              <div style="font-size:11px;font-weight:700;color:#15803D;margin-bottom:3px">&#9989; Photo captured
+                ${photo.takenBy ? `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border-radius:8px;background:${photo.roleColor||'#1e3a5f'};font-size:10px;font-weight:700;color:#fff;">${photo.takenByRole==='Salesman'?'🤝':'🔨'} ${photo.takenBy}</span>` : ''}
+              </div>
               <input class="photo-note-input" placeholder="Add a note (optional)..."
                      value="${photo.note||''}"
                      onchange="setPhotoNote('${item.id}',this.value)"
@@ -5172,7 +5242,27 @@ function handlePhotoUpload(input, itemId, sectionId) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    pcState.photos[itemId] = { file, dataUrl: e.target.result, note: '', ts: new Date().toISOString() };
+    // Determine who took this photo based on section role
+    const sectionRole = (() => {
+      const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+      if (!checklist) return null;
+      const sec = checklist.sections.find(s => s.id === sectionId);
+      return sec ? sec.role : null;
+    })();
+    const takerName = sectionRole === 'salesman'
+      ? (state.user ? state.user.full_name : 'Salesman')
+      : sectionRole === 'crew_lead'
+        ? (pcState.crew || 'Crew Lead')
+        : (state.user ? state.user.full_name : 'Unknown');
+    pcState.photos[itemId] = {
+      file,
+      dataUrl: e.target.result,
+      note: '',
+      ts: new Date().toISOString(),
+      takenBy: takerName,
+      takenByRole: sectionRole === 'salesman' ? 'Salesman' : sectionRole === 'crew_lead' ? 'Crew Lead' : 'Unknown',
+      roleColor: sectionRole === 'salesman' ? '#15803d' : sectionRole === 'crew_lead' ? '#c2410c' : '#1e6fff',
+    };
     refreshPCItem(itemId, sectionId);
     updatePCSummary();
     updateSectionProgress(sectionId);
