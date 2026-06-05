@@ -1546,7 +1546,7 @@ async function acceptInviteSubmit(){
     if (r.ok) {
       // Auto-login
       const lr = await callFunction('authLogin', { email: r.email, password: pass });
-      if (lr.success) {
+      if (lr.ok) {
         saveSession(lr.user, lr.company);
         document.getElementById('invite-screen').remove();
         document.getElementById('sidebar').style.display = 'flex';
@@ -1586,7 +1586,7 @@ async function doLogin(){
   btn.textContent='Signing in...';btn.disabled=true;msgEl.textContent='';
   try{
     const r=await callFunction('authLogin',{email,password});
-    if(r.success){
+    if(r.ok){
       saveSession(r.user,r.company);
       document.getElementById('login-screen').remove();
       const fb2=document.getElementById('static-login-fallback');if(fb2)fb2.remove();
@@ -1612,10 +1612,10 @@ async function doRegister(){
   btn.textContent='Creating account...';btn.disabled=true;msgEl.textContent='';
   try{
     const r=await callFunction('authRegister',{company_name:company,owner_name:name,owner_email:email,phone});
-    if(r.success){
+    if(r.ok){
       // auto-login
       const lr=await callFunction('authLogin',{email});
-      if(lr.success){
+      if(lr.ok){
         saveSession(lr.user,lr.company);
         document.getElementById('login-screen').remove();
         document.getElementById('sidebar').style.display='flex';
