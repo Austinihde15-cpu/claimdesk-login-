@@ -1897,7 +1897,7 @@ function goto(page, param) {
   if (page === 'dashboard') loadDashboard();
   else if (page === 'claims') renderClaimsPage();
   else if (page === 'tasks') loadTasksPage();
-  else if (page === 'settings') renderSettingsPage();
+  else if (page === 'settings') { renderSettingsPage(); setTimeout(loadSettingsTabData, 100); }
   else if (page === 'docbuilder') renderDocBuilderPage();
   else if (page === 'photochecklist') renderPhotoChecklistPage();
   else if (page === 'claim') openClaimDetail(param);
@@ -2864,90 +2864,813 @@ async function loadReportsPage() {
 // ===========================================================
 //  SETTINGS PAGE
 // ===========================================================
-function renderSettingsPage() {
+function renderSettingsPage(activeTab) {
+  const tab = activeTab || state._settingsTab || 'profile';
+  state._settingsTab = tab;
+
+  const isAdmin = ['owner','admin'].includes(state.user?.role);
+  const isOwner = state.user?.role === 'owner';
+
+  const tabs = [
+    { id: 'profile',      icon: '👤', label: 'My Profile' },
+    { id: 'account',      icon: '🏢', label: 'My Account' },
+    { id: 'users',        icon: '👥', label: 'Team & Users' },
+    { id: 'automations',  icon: '⚡', label: 'Automations' },
+    { id: 'reports',      icon: '📊', label: 'Reports' },
+    { id: 'integrations', icon: '🔗', label: 'Integrations' },
+    ...(isAdmin ? [{ id: 'admin', icon: '🛡️', label: 'Admin' }] : []),
+    { id: 'billing',      icon: '💳', label: 'Billing' },
+  ];
+
   document.getElementById('content').innerHTML = `
-    <div style="max-width:640px">
-      <div class="section-title mb-4">System Settings</div>
+    <div style="max-width:900px;margin:0 auto;">
 
-      <!-- SYNC CONTROLS -->
-      <div class="card mb-4">
-        <div class="card-header"><div class="card-title">&#x1F504; JobNimbus Sync</div></div>
-        <div class="card-body">
-          <p class="text-sm text-muted" style="margin-bottom:14px">Syncs all JN insurance jobs into ClaimDesk and stamps assigned_rep_email for access control.</p>
-          <div class="action-grid">
-            <button class="btn btn-primary" onclick="syncJN()">&#x1F504; Sync Now</button>
-            <button class="btn btn-ghost" onclick="showToast('Auto-sync runs every 6 hours','info')">&#x2139;&#xFE0F; Auto-Sync: Every 6 Hours</button>
-          </div>
+      <!-- PAGE HEADER -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+        <div style="font-size:28px">⚙️</div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:var(--text1)">Settings</div>
+          <div style="font-size:13px;color:var(--text2)">Manage your account, team, automations, and preferences</div>
         </div>
       </div>
 
-      <!-- AI ENGINE -->
-      <div class="card mb-4">
-        <div class="card-header"><div class="card-title">&#x26A1; AI Workflow Engine</div></div>
-        <div class="card-body">
-          <p class="text-sm text-muted" style="margin-bottom:14px">Recalculates stall scores, creates AI tasks, flags anomalies, and generates the daily AgentReport.</p>
-          <div class="action-grid">
-            <button class="btn btn-orange" onclick="runSweep()">&#x26A1; Run Full Sweep Now</button>
-            <button class="btn btn-ghost" onclick="showToast('Daily sweep runs at 7 AM CST','info')">&#x2139;&#xFE0F; Auto-Sweep: Daily 7 AM</button>
+      <!-- TAB BAR -->
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:24px;background:var(--surface2);border-radius:12px;padding:6px">
+        ${tabs.map(t => `
+          <button onclick="renderSettingsPage('${t.id}')" style="
+            display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:none;
+            cursor:pointer;font-size:13px;font-weight:500;transition:all 0.15s;
+            background:${tab === t.id ? 'var(--primary)' : 'transparent'};
+            color:${tab === t.id ? '#fff' : 'var(--text2)'};
+          ">${t.icon} ${t.label}</button>
+        `).join('')}
+      </div>
+
+      <!-- TAB CONTENT -->
+      <div id="settings-tab-content">
+        ${tab === 'profile'      ? renderSettingsProfile()      : ''}
+        ${tab === 'account'      ? renderSettingsAccount()      : ''}
+        ${tab === 'users'        ? renderSettingsUsers()        : ''}
+        ${tab === 'automations'  ? renderSettingsAutomations()  : ''}
+        ${tab === 'reports'      ? renderSettingsReports()      : ''}
+        ${tab === 'integrations' ? renderSettingsIntegrations() : ''}
+        ${tab === 'admin'        ? (isAdmin ? renderSettingsAdmin() : '<div class="alert alert-danger">Access denied.</div>') : ''}
+        ${tab === 'billing'      ? renderSettingsBilling()      : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ── PROFILE TAB ──────────────────────────────────────────────
+function renderSettingsProfile() {
+  const u = state.user || {};
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">👤 Personal Information</div></div>
+      <div class="card-body">
+        <div class="detail-grid" style="margin-bottom:20px">
+          <div class="field-group">
+            <div class="field-label">Full Name</div>
+            <input class="form-input" id="prf-name" value="${u.full_name || ''}" placeholder="Your full name">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Email Address</div>
+            <input class="form-input" id="prf-email" value="${u.email || ''}" disabled style="opacity:0.6;cursor:not-allowed">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Phone</div>
+            <input class="form-input" id="prf-phone" value="${u.phone || ''}" placeholder="(314) 000-0000">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Role</div>
+            <div class="field-value" style="padding-top:6px">${getRoleBadge(u.role)}</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()">💾 Save Changes</button>
+        <div id="prf-msg" style="margin-top:10px;font-size:13px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔒 Change Password</div></div>
+      <div class="card-body">
+        <div class="detail-grid" style="margin-bottom:16px">
+          <div class="field-group">
+            <div class="field-label">Current Password</div>
+            <input class="form-input" type="password" id="pw-current" placeholder="Current password">
+          </div>
+          <div class="field-group">
+            <div class="field-label">New Password</div>
+            <input class="form-input" type="password" id="pw-new" placeholder="At least 8 characters">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Confirm New Password</div>
+            <input class="form-input" type="password" id="pw-confirm" placeholder="Repeat new password">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()">🔒 Update Password</button>
+        <div id="pw-msg" style="margin-top:10px;font-size:13px"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveProfile() {
+  const name = document.getElementById('prf-name')?.value.trim();
+  const phone = document.getElementById('prf-phone')?.value.trim();
+  const msgEl = document.getElementById('prf-msg');
+  try {
+    await callFunction('entityUpdate', { entity: 'CompanyUser', id: state.user.id, data: { full_name: name, phone } });
+    state.user.full_name = name;
+    saveSession(state.user, state.company);
+    if (msgEl) msgEl.innerHTML = '<span style="color:#22c55e">✅ Profile updated.</span>';
+    updateSidebarUser();
+  } catch(e) {
+    if (msgEl) msgEl.innerHTML = '<span style="color:#ef4444">❌ ' + e.message + '</span>';
+  }
+}
+
+async function changePassword() {
+  const curr = document.getElementById('pw-current')?.value;
+  const nw   = document.getElementById('pw-new')?.value;
+  const conf = document.getElementById('pw-confirm')?.value;
+  const msgEl = document.getElementById('pw-msg');
+  if (!curr || !nw) { if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">Fill in all fields.</span>'; return; }
+  if (nw !== conf)  { if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">Passwords do not match.</span>'; return; }
+  if (nw.length < 8) { if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">Password must be at least 8 characters.</span>'; return; }
+  try {
+    const r = await callFunction('changePassword', { user_id: state.user.id, current_password: curr, new_password: nw });
+    if (r.ok) {
+      if(msgEl) msgEl.innerHTML='<span style="color:#22c55e">✅ Password changed successfully.</span>';
+      document.getElementById('pw-current').value='';
+      document.getElementById('pw-new').value='';
+      document.getElementById('pw-confirm').value='';
+    } else {
+      if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">❌ ' + (r.error||'Failed') + '</span>';
+    }
+  } catch(e) {
+    if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">❌ ' + e.message + '</span>';
+  }
+}
+
+// ── ACCOUNT TAB ──────────────────────────────────────────────
+function renderSettingsAccount() {
+  const co = state.company || {};
+  const planColors = { trial:'#374151', starter:'#2563eb', pro:'#7c3aed', elite:'#d97706' };
+  const planColor = planColors[co.plan] || '#374151';
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🏢 Company Account</div></div>
+      <div class="card-body">
+        <div class="detail-grid" style="margin-bottom:20px">
+          <div class="field-group">
+            <div class="field-label">Company Name</div>
+            <div class="field-value" style="font-weight:700">${co.name || '—'}</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Plan</div>
+            <div class="field-value"><span style="background:${planColor};color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${(co.plan||'—').toUpperCase()}</span></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Plan Status</div>
+            <div class="field-value">${co.plan_status === 'active' ? '✅ Active' : '⚠️ ' + (co.plan_status||'Unknown')}</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Seats Used / Included</div>
+            <div class="field-value">${co.seats_used||0} / ${co.seats_included||2}</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Estimates This Month</div>
+            <div class="field-value">${co.estimates_used_this_month||0} / ${co.estimates_limit||'∞'}</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Success Fee Rate</div>
+            <div class="field-value">${co.success_fee_pct||4}%</div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- HOMEOWNER FOLLOW-UPS -->
-      <div class="card mb-4">
-        <div class="card-header"><div class="card-title">&#x1F4E7; Homeowner Follow-Up Drafts</div></div>
-        <div class="card-body">
-          <p class="text-sm text-muted" style="margin-bottom:14px">Scans all stalled jobs and drafts personalized follow-up emails into Gmail Drafts.</p>
-          <div class="action-grid">
-            <button class="btn btn-primary" onclick="runFollowups()">&#x1F4E7; Generate Follow-Up Drafts Now</button>
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">📊 Usage This Month</div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+          <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:10px">
+            <div style="font-size:28px;font-weight:800;color:var(--primary)">${state.claims?.length||0}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Total Claims</div>
+          </div>
+          <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:10px">
+            <div style="font-size:28px;font-weight:800;color:#22c55e">${state.stats?.approved||0}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Approved</div>
+          </div>
+          <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:10px">
+            <div style="font-size:28px;font-weight:800;color:#f59e0b">${state.stats?.supp||0}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">Needs Supplement</div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- ACCESS CONTROL -->
-      <div class="card mb-4">
-        <div class="card-header"><div class="card-title">&#x1F510; Access Control</div></div>
-        <div class="card-body">
-          <div class="alert alert-info">
-            <div>
-              <div style="font-weight:700;margin-bottom:4px">Per-Rep Access Control is Active</div>
-              <div class="text-sm">Admins see all claims. Regular users see only claims where <code>assigned_rep_email</code> matches their login email.</div>
-            </div>
-          </div>
-          <div class="detail-grid three" style="margin-top:14px">
-            <div class="field-group"><div class="field-label">Your Role</div><div class="field-value">${state.user.role}</div></div>
-            <div class="field-group"><div class="field-label">Your Email</div><div class="field-value text-sm">${state.user.email}</div></div>
-          </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">⚠️ Danger Zone</div></div>
+      <div class="card-body">
+        <p class="text-sm text-muted" style="margin-bottom:14px">These actions are irreversible. Proceed with caution.</p>
+        <button class="btn btn-ghost" style="border:1px solid #ef4444;color:#ef4444" onclick="confirmSignOut()">🚪 Sign Out of All Devices</button>
+      </div>
+    </div>
+  `;
+}
+
+function confirmSignOut() {
+  if (confirm('Sign out of all devices?')) {
+    clearSession();
+    location.reload();
+  }
+}
+
+// ── USERS TAB ────────────────────────────────────────────────
+function renderSettingsUsers() {
+  const isAdmin = ['owner','admin'].includes(state.user?.role);
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">👥 Team Members</div>
+        ${isAdmin ? `<button class="btn btn-primary btn-sm" onclick="showInviteModal()">+ Invite User</button>` : ''}
+      </div>
+      <div class="card-body">
+        <div id="users-list">
+          <div class="spinner" style="width:24px;height:24px;margin:20px auto"></div>
         </div>
       </div>
+    </div>
 
-      <!-- FUNCTIONS REFERENCE -->
-      <div class="card">
-        <div class="card-header"><div class="card-title">&#x2699;&#xFE0F; Backend Functions</div></div>
-        <div class="card-body">
-          <div style="display:grid;gap:8px">
-            ${[
-              ['analyzeDocument','Parses uploaded PDFs with LlamaParse + GPT-4o, extracts line items, identifies supplement gaps'],
-              ['automateClaimWorkflow','Recalculates stall scores, creates tasks, detects anomalies, writes AgentReport'],
-              ['draftEmail','Drafts adjuster follow-up, supplement demands, denial rebuttals, homeowner updates'],
-              ['createEvidencePacket','Assembles full supplement packet with cover letter + line item summary'],
-              ['syncToJobNimbus','Pushes 26 ClaimDesk fields to corresponding JN custom fields'],
-              ['claimDeskSync','Pulls all JN insurance jobs and upserts into ClaimDesk with rep email stamping'],
-              ['getClaimsForUser','Access control layer -- filters claims by login email for non-admin users'],
-              ['uploadAttachment','Auto-tags files by name pattern and triggers LlamaParse pipeline'],
-              ['sendAdjusterEmail','AI drafts email and saves to Gmail Drafts folder'],
-              ['homeownerFollowUp','Scans stalled claims and drafts personalized homeowner follow-up emails'],
-            ].map(([name, desc]) => `
-            <div style="padding:10px 12px;background:var(--navy3);border-radius:8px;border:1px solid var(--border)">
-              <div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:3px">${name}</div>
-              <div class="text-sm text-muted">${desc}</div>
-            </div>`).join('')}
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Seat Usage</div></div>
+      <div class="card-body">
+        <div style="background:var(--surface2);border-radius:8px;padding:16px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:13px;color:var(--text2)">Seats used</span>
+            <span style="font-weight:700" id="seat-counter">Loading...</span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px">
+            <div id="seat-bar" style="background:var(--primary);height:6px;border-radius:4px;width:0%;transition:width 0.4s"></div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:8px">
+            ${state.company?.plan?.toUpperCase() || 'PLAN'} plan · Need more seats? 
+            <a href="#" onclick="renderSettingsPage('billing')" style="color:var(--primary)">Upgrade</a>
           </div>
         </div>
       </div>
     </div>
   `;
 }
+
+async function loadUsersTab() {
+  try {
+    const r = await callFunction('entityFetch', { entity: 'CompanyUser', query: { company_id: state.company?.id } });
+    const users = r.records || [];
+    const listEl = document.getElementById('users-list');
+    const seatEl = document.getElementById('seat-counter');
+    const barEl  = document.getElementById('seat-bar');
+    const seated = users.filter(u => u.status === 'active').length;
+    const total  = state.company?.seats_included || 2;
+    if (seatEl) seatEl.textContent = seated + ' / ' + total;
+    if (barEl)  barEl.style.width  = Math.min(100, (seated/total)*100) + '%';
+    if (!listEl) return;
+    if (!users.length) { listEl.innerHTML = '<div class="empty-state"><p>No users yet.</p></div>'; return; }
+    const isAdmin = ['owner','admin'].includes(state.user?.role);
+    listEl.innerHTML = `
+      <div style="display:grid;gap:10px">
+        ${users.map(u => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:10px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:38px;height:38px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">
+                ${(u.full_name||u.email||'?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div style="font-weight:600;color:var(--text1)">${u.full_name || u.email}</div>
+                <div style="font-size:12px;color:var(--text2)">${u.email}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${getRoleBadge(u.role)}
+              ${getStatusBadge(u.status)}
+              ${(isAdmin && u.id !== state.user?.id) ? `
+                <button class="btn btn-ghost btn-sm" onclick="resendInvite('${u.id}','${u.email}')" title="Resend invite" style="padding:4px 8px;font-size:12px">📤</button>
+                <button class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:12px;color:#ef4444" onclick="removeUser('${u.id}','${u.full_name||u.email}')">✕</button>
+              ` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch(e) {
+    const listEl = document.getElementById('users-list');
+    if (listEl) listEl.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+  }
+}
+
+function getRoleBadge(role) {
+  const colors = { owner:'#d97706', admin:'#7c3aed', field_rep:'#2563eb', user:'#374151' };
+  const c = colors[role] || '#374151';
+  return `<span style="background:${c};color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">${(role||'user').replace('_',' ').toUpperCase()}</span>`;
+}
+
+function getStatusBadge(status) {
+  const map = { active:['#22c55e','Active'], invited:['#f59e0b','Invited'], inactive:['#6b7280','Inactive'] };
+  const [c, l] = map[status] || ['#6b7280','Unknown'];
+  return `<span style="background:${c}22;color:${c};font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">${l}</span>`;
+}
+
+function showInviteModal() {
+  openModal('Invite Team Member', `
+    <div style="display:grid;gap:14px">
+      <div class="field-group">
+        <div class="field-label">Full Name</div>
+        <input class="form-input" id="inv-name-new" placeholder="First Last">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Email Address</div>
+        <input class="form-input" id="inv-email-new" type="email" placeholder="user@company.com">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Role</div>
+        <select class="form-input" id="inv-role-new">
+          <option value="field_rep">Field Rep</option>
+          <option value="admin">Admin</option>
+          <option value="user">User</option>
+        </select>
+      </div>
+      <div id="inv-msg-new" style="font-size:13px"></div>
+    </div>
+  `, [
+    { label: 'Cancel', action: 'closeModal()' },
+    { label: '📤 Send Invite', primary: true, action: 'sendNewInvite()' }
+  ]);
+}
+
+async function sendNewInvite() {
+  const name  = document.getElementById('inv-name-new')?.value.trim();
+  const email = document.getElementById('inv-email-new')?.value.trim();
+  const role  = document.getElementById('inv-role-new')?.value;
+  const msgEl = document.getElementById('inv-msg-new');
+  if (!email) { if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">Email required.</span>'; return; }
+  try {
+    const r = await callFunction('inviteUser', {
+      company_id: state.company?.id,
+      inviter_email: state.user?.email,
+      invite_email: email,
+      invite_name: name || email,
+      role
+    });
+    if (r.success || r.ok) {
+      if(msgEl) msgEl.innerHTML = `<span style="color:#22c55e">✅ Invite link created!<br><small>Share: <code style="font-size:11px">${r.invite_url||''}</code></small></span>`;
+    } else {
+      if(msgEl) msgEl.innerHTML = `<span style="color:#ef4444">❌ ${r.error||'Failed'}</span>`;
+    }
+  } catch(e) {
+    if(msgEl) msgEl.innerHTML = `<span style="color:#ef4444">❌ ${e.message}</span>`;
+  }
+}
+
+async function resendInvite(userId, email) {
+  showToast('Generating new invite link for ' + email + '...', 'info');
+}
+
+async function removeUser(userId, name) {
+  if (!confirm('Remove ' + name + ' from your team? They will lose access immediately.')) return;
+  try {
+    await callFunction('entityUpdate', { entity: 'CompanyUser', id: userId, data: { status: 'inactive' } });
+    showToast(name + ' removed.', 'success');
+    renderSettingsPage('users');
+    setTimeout(loadUsersTab, 300);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── AUTOMATIONS TAB ──────────────────────────────────────────
+function renderSettingsAutomations() {
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">⚡ Active Automations</div></div>
+      <div class="card-body">
+        <div style="display:grid;gap:14px">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:3px">🔄 JobNimbus Master Sync</div>
+              <div style="font-size:12px;color:var(--text2)">Syncs all JN insurance jobs into ClaimDesk every 6 hours</div>
+              <div style="font-size:11px;color:#22c55e;margin-top:4px">● Running · Every 6 hours</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="syncJN()">▶ Run Now</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:3px">⚡ AI Daily Sweep</div>
+              <div style="font-size:12px;color:var(--text2)">Recalculates stall scores, flags anomalies, generates AgentReport · Daily 7 AM CST</div>
+              <div style="font-size:11px;color:#22c55e;margin-top:4px">● Running · Daily at 7:00 AM</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-orange btn-sm" onclick="runSweep()">▶ Run Now</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:3px">📧 Homeowner Follow-Up Drafter</div>
+              <div style="font-size:12px;color:var(--text2)">Scans stalled jobs, drafts personalized follow-up emails into Gmail Drafts · Daily 8 AM CST</div>
+              <div style="font-size:11px;color:#22c55e;margin-top:4px">● Running · Daily at 8:00 AM</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="runFollowups()">▶ Run Now</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:3px">📥 Gmail Inbound Parser</div>
+              <div style="font-size:12px;color:var(--text2)">Scans Gmail for carrier responses, adjuster emails, and SOLs · Every 30 min</div>
+              <div style="font-size:11px;color:#22c55e;margin-top:4px">● Running · Every 30 minutes</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="showToast('Gmail parser will run at next scheduled interval','info')">ⓘ Info</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Automation Log (Last 24h)</div></div>
+      <div class="card-body">
+        <div id="auto-log-content">
+          <div style="display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 12px;background:var(--surface2);border-radius:8px">
+              <span>🔄 JN Sync</span><span style="color:var(--text2)">Ran 4x · 0.6 credits</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 12px;background:var(--surface2);border-radius:8px">
+              <span>⚡ Daily Sweep</span><span style="color:var(--text2)">Ran 1x · 0.1 credits</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 12px;background:var(--surface2);border-radius:8px">
+              <span>📧 Follow-Up Drafter</span><span style="color:var(--text2)">Ran 1x · 0.1 credits</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── REPORTS TAB ──────────────────────────────────────────────
+function renderSettingsReports() {
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">📊 AI Agent Reports</div>
+        <button class="btn btn-orange btn-sm" onclick="runSweep()">⚡ Generate New Report</button>
+      </div>
+      <div class="card-body">
+        <div id="reports-list">
+          <div class="spinner" style="width:24px;height:24px;margin:20px auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">📤 Export Data</div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button class="btn btn-ghost" onclick="exportClaimsCSV()">📄 Export Claims CSV</button>
+          <button class="btn btn-ghost" onclick="exportTasksCSV()">✅ Export Tasks CSV</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadReportsTab() {
+  const el = document.getElementById('reports-list');
+  if (!el) return;
+  try {
+    const r = await callFunction('entityFetch', { entity: 'AgentReport', limit: 10 });
+    const reports = (r.records || []).reverse();
+    if (!reports.length) { el.innerHTML = '<div class="empty-state"><p>No reports yet. Run the AI Sweep to generate one.</p></div>'; return; }
+    el.innerHTML = `<div style="display:grid;gap:10px">` + reports.map(rpt => `
+      <div style="padding:14px 16px;background:var(--surface2);border-radius:10px;cursor:pointer" onclick="showReportDetail('${rpt.id}')">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <div style="font-weight:600">${rpt.report_type||'Daily Sweep'}</div>
+          <div style="font-size:12px;color:var(--text2)">${(rpt.generated_at||'').slice(0,10)}</div>
+        </div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${rpt.summary?.slice(0,120)||'—'}...</div>
+        <div style="display:flex;gap:12px;font-size:12px">
+          <span>📋 ${rpt.claims_reviewed||0} claims</span>
+          <span style="color:#ef4444">🚨 ${rpt.urgent_count||0} urgent</span>
+          <span style="color:#f59e0b">⏸ ${rpt.stalled_count||0} stalled</span>
+        </div>
+      </div>
+    `).join('') + `</div>`;
+  } catch(e) {
+    el.innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
+  }
+}
+
+function showReportDetail(id) {
+  const rpt = state.reports?.find(r => r.id === id);
+  if (!rpt) { showToast('Report not found','error'); return; }
+  openModal('📊 ' + (rpt.report_type||'Agent Report') + ' — ' + (rpt.generated_at||'').slice(0,10), `
+    <div style="font-size:13px;line-height:1.7;max-height:400px;overflow-y:auto">
+      <div style="margin-bottom:12px"><strong>Summary:</strong><br>${rpt.summary||'—'}</div>
+      <div style="margin-bottom:12px"><strong>Action Items:</strong><br>${(rpt.action_items||[]).join('<br>') || '—'}</div>
+      <div style="margin-bottom:12px"><strong>Anomalies:</strong><br>${(rpt.anomalies||[]).join('<br>') || 'None detected'}</div>
+    </div>
+  `);
+}
+
+function exportClaimsCSV() {
+  const claims = state.claims || [];
+  if (!claims.length) { showToast('No claims to export','info'); return; }
+  const headers = ['job_number','insured_name','address','carrier','status','carrier_rcv','cox_rcv','net_supplement','assigned_rep','date_of_loss'];
+  const rows = claims.map(c => headers.map(h => JSON.stringify(c[h]||'')).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='claimdesk_claims.csv'; a.click();
+  showToast('Claims exported!','success');
+}
+
+function exportTasksCSV() {
+  const tasks = state.tasks || [];
+  if (!tasks.length) { showToast('No tasks to export','info'); return; }
+  const headers = ['title','task_type','status','priority','due_date','assigned_to'];
+  const rows = tasks.map(t => headers.map(h => JSON.stringify(t[h]||'')).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='claimdesk_tasks.csv'; a.click();
+  showToast('Tasks exported!','success');
+}
+
+// ── INTEGRATIONS TAB ─────────────────────────────────────────
+function renderSettingsIntegrations() {
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🔗 Connected Integrations</div></div>
+      <div class="card-body">
+        <div style="display:grid;gap:12px">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="font-size:28px">🏗️</div>
+              <div>
+                <div style="font-weight:600">JobNimbus</div>
+                <div style="font-size:12px;color:var(--text2)">CRM sync — pulls insurance jobs, pushes ClaimDesk data back</div>
+                <div style="font-size:11px;color:#22c55e;margin-top:2px">● Connected</div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="syncJN()">🔄 Sync Now</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="font-size:28px">📧</div>
+              <div>
+                <div style="font-weight:600">Gmail</div>
+                <div style="font-size:12px;color:var(--text2)">Reads carrier emails, drafts follow-ups, sends supplements</div>
+                <div style="font-size:11px;color:#22c55e;margin-top:2px">● Connected</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="showToast('Gmail connected via OAuth','info')">ⓘ Details</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="font-size:28px">🗺️</div>
+              <div>
+                <div style="font-weight:600">Google Maps / Satellite</div>
+                <div style="font-size:12px;color:var(--text2)">Pulls roof measurements from satellite imagery for estimates</div>
+                <div style="font-size:11px;color:#22c55e;margin-top:2px">● Active via Randy AI</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px;opacity:0.6">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="font-size:28px">📐</div>
+              <div>
+                <div style="font-weight:600">HOVER / EagleView</div>
+                <div style="font-size:12px;color:var(--text2)">Professional 3D roof measurements — coming soon</div>
+                <div style="font-size:11px;color:#9ca3af;margin-top:2px">○ Not connected</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" disabled>Coming Soon</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px;opacity:0.6">
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="font-size:28px">📋</div>
+              <div>
+                <div style="font-weight:600">Xactimate / Symbility</div>
+                <div style="font-size:12px;color:var(--text2)">Direct scope import from carrier estimate files</div>
+                <div style="font-size:11px;color:#9ca3af;margin-top:2px">○ Not connected</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" disabled>Coming Soon</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔑 API Keys</div></div>
+      <div class="card-body">
+        <div style="display:grid;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px">
+            <div>
+              <div style="font-size:13px;font-weight:600">JobNimbus API Key</div>
+              <div style="font-size:12px;color:var(--text2)">••••••••••••••••••••••••</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="showToast('Contact Randy to update API keys','info')">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── ADMIN TAB ────────────────────────────────────────────────
+function renderSettingsAdmin() {
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🛡️ Admin Controls</div></div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:16px">
+          <div>Admin view — you can see and manage all company data.</div>
+        </div>
+        <div style="display:grid;gap:12px">
+          <button class="btn btn-primary" onclick="syncJN()">🔄 Force Full JN Sync</button>
+          <button class="btn btn-orange" onclick="runSweep()">⚡ Force AI Sweep Now</button>
+          <button class="btn btn-ghost" onclick="runFollowups()">📧 Force Follow-Up Drafts</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">📋 All Company Users</div></div>
+      <div class="card-body">
+        <div id="admin-users-list">
+          <div class="spinner" style="width:24px;height:24px;margin:20px auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🔎 Anomaly Log</div></div>
+      <div class="card-body">
+        <div id="admin-anomalies">
+          <div class="spinner" style="width:24px;height:24px;margin:20px auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">🏢 Platform Info</div></div>
+      <div class="card-body">
+        <div class="detail-grid">
+          <div class="field-group"><div class="field-label">App ID</div><div class="field-value text-sm" style="font-family:monospace">6a0ec85f9e963ce8edb7126c</div></div>
+          <div class="field-group"><div class="field-label">Backend URL</div><div class="field-value text-sm" style="font-family:monospace">v-edb7126c.base44.app</div></div>
+          <div class="field-group"><div class="field-label">Company ID</div><div class="field-value text-sm" style="font-family:monospace">${state.company?.id||'—'}</div></div>
+          <div class="field-group"><div class="field-label">Your User ID</div><div class="field-value text-sm" style="font-family:monospace">${state.user?.id||'—'}</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadAdminTab() {
+  // Load users
+  const usersEl = document.getElementById('admin-users-list');
+  const anomaliesEl = document.getElementById('admin-anomalies');
+  try {
+    const r = await callFunction('entityFetch', { entity: 'CompanyUser', query: { company_id: state.company?.id } });
+    const users = r.records || [];
+    if (usersEl) {
+      usersEl.innerHTML = `<div style="display:grid;gap:8px">${users.map(u => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:8px">
+          <div>
+            <span style="font-weight:600">${u.full_name||u.email}</span>
+            <span style="font-size:12px;color:var(--text2);margin-left:8px">${u.email}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            ${getRoleBadge(u.role)} ${getStatusBadge(u.status)}
+          </div>
+        </div>
+      `).join('')}</div>`;
+    }
+  } catch(e) { if(usersEl) usersEl.innerHTML = e.message; }
+
+  try {
+    const ra = await callFunction('entityFetch', { entity: 'ClaimAnomaly', query: { resolved: false } });
+    const anoms = ra.records || [];
+    if (anomaliesEl) {
+      if (!anoms.length) { anomaliesEl.innerHTML = '<div class="empty-state"><p>No open anomalies.</p></div>'; }
+      else anomaliesEl.innerHTML = `<div style="display:grid;gap:8px">${anoms.slice(0,10).map(a => `
+        <div style="padding:10px 14px;background:var(--surface2);border-radius:8px;font-size:13px">
+          <span style="font-weight:600;color:#ef4444">${a.anomaly_type}</span> · <span style="color:var(--text2)">${a.description?.slice(0,80)||'—'}</span>
+        </div>
+      `).join('')}</div>`;
+    }
+  } catch(e) { if(anomaliesEl) anomaliesEl.innerHTML = e.message; }
+}
+
+// ── BILLING TAB ──────────────────────────────────────────────
+function renderSettingsBilling() {
+  const co = state.company || {};
+  const plans = [
+    { id:'starter', name:'Starter', price:199, seats:2, estimates:50, color:'#2563eb' },
+    { id:'pro',     name:'Pro',     price:499, seats:8, estimates:200, color:'#7c3aed' },
+    { id:'elite',   name:'Elite',   price:999, seats:999, estimates:999, color:'#d97706' },
+  ];
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">💳 Current Plan</div></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--surface2);border-radius:10px;margin-bottom:16px">
+          <div style="font-size:36px">⭐</div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary)">${(co.plan||'starter').toUpperCase()}</div>
+            <div style="font-size:13px;color:var(--text2)">${co.plan_status === 'active' ? '✅ Active and in good standing' : '⚠️ ' + (co.plan_status||'')}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">${co.seats_used||0} / ${co.seats_included||2} seats · ${co.estimates_used_this_month||0} estimates this month · 4% success fee on approved supplements</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">📋 Available Plans</div></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+          ${plans.map(p => `
+            <div style="padding:18px;border-radius:12px;border:2px solid ${co.plan===p.id ? p.color : 'var(--border)'};text-align:center;position:relative">
+              ${co.plan===p.id ? `<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:${p.color};color:#fff;font-size:10px;padding:2px 10px;border-radius:10px;font-weight:700">CURRENT</div>` : ''}
+              <div style="font-weight:800;font-size:16px;color:${p.color};margin-bottom:6px">${p.name}</div>
+              <div style="font-size:26px;font-weight:800;margin-bottom:4px">$${p.price}</div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:12px">/month</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px">${p.seats === 999 ? 'Unlimited' : p.seats} seats</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">${p.estimates === 999 ? 'Unlimited' : p.estimates} estimates/mo</div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:14px">4% supplement success fee</div>
+              ${co.plan !== p.id ? `<button class="btn btn-primary btn-sm" style="width:100%;background:${p.color};border-color:${p.color}" onclick="showToast('Contact Austin to upgrade plan','info')">Upgrade</button>` : `<div style="font-size:12px;color:${p.color};font-weight:600">✓ Active</div>`}
+            </div>
+          `).join('')}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--text2);text-align:center">Annual billing saves ~16%. Contact Austin@coxroof.com to manage your subscription.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Billing History</div></div>
+      <div class="card-body">
+        <div id="billing-history">
+          <div class="spinner" style="width:24px;height:24px;margin:20px auto"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadBillingTab() {
+  const el = document.getElementById('billing-history');
+  if (!el) return;
+  try {
+    const r = await callFunction('entityFetch', { entity: 'BillingEvent', query: { company_id: state.company?.id }, limit: 20 });
+    const events = r.records || [];
+    if (!events.length) { el.innerHTML = '<div class="empty-state"><p>No billing history yet.</p></div>'; return; }
+    el.innerHTML = `<div style="display:grid;gap:8px">${events.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600">${e.description||e.event_type||'—'}</div>
+          <div style="font-size:12px;color:var(--text2)">${(e.billing_date||'').slice(0,10)}</div>
+        </div>
+        <div style="font-weight:700;color:${(e.amount||0)>0?'#22c55e':'var(--text1)'}">$${(e.amount||0).toFixed(2)}</div>
+      </div>
+    `).join('')}</div>`;
+  } catch(e) { el.innerHTML = e.message; }
+}
+
+function loadSettingsTabData() {
+  const tab = state._settingsTab || 'profile';
+  if (tab === 'users')        loadUsersTab();
+  else if (tab === 'reports') loadReportsTab();
+  else if (tab === 'admin')   loadAdminTab();
+  else if (tab === 'billing') loadBillingTab();
+}
+
+
 
 // ===========================================================
 //  MODALS
