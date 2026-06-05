@@ -2259,18 +2259,22 @@ async function loadDashboard() {
 // ===========================================================
 function renderClaimsPage(filter = '') {
   const claims = state.claims.length ? state.claims : [];
-  const filtered = filter ? claims.filter(c => c.status === filter) : claims;
+  const filtered = filter ? claims.filter(c => (c.status_name||c.status||'').toLowerCase() === filter.toLowerCase() || (c.status||'').replace(/_/g,' ').toLowerCase() === filter.toLowerCase()) : claims;
   const sorted = [...filtered].sort((a,b) => (b.stall_score||0) - (a.stall_score||0));
 
   document.getElementById('content').innerHTML = `
-    <!-- FILTER BAR -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+    <!-- FILTER BAR — Real JN Statuses -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
       <button class="btn ${!filter?'btn-primary':'btn-ghost'} btn-sm" onclick="filterClaims('')">All (${claims.length})</button>
-      <button class="btn ${filter==='supplement_needed'?'btn-orange':'btn-ghost'} btn-sm" onclick="filterClaims('supplement_needed')">Supplement Needed (${claims.filter(c=>c.status==='supplement_needed').length})</button>
-      <button class="btn ${filter==='denied'?'btn-danger':'btn-ghost'} btn-sm" onclick="filterClaims('denied')">Denied (${claims.filter(c=>c.status==='denied').length})</button>
-      <button class="btn ${filter==='pending_signature'?'btn-orange':'btn-ghost'} btn-sm" onclick="filterClaims('pending_signature')">Pending Sig (${claims.filter(c=>c.status==='pending_signature').length})</button>
-      <button class="btn ${filter==='approved'?'btn-green':'btn-ghost'} btn-sm" onclick="filterClaims('approved')">Approved (${claims.filter(c=>c.status==='approved').length})</button>
-      <button class="btn ${filter==='claim_filed'?'btn-primary':'btn-ghost'} btn-sm" onclick="filterClaims('claim_filed')">Claim Filed (${claims.filter(c=>c.status==='claim_filed').length})</button>
+      <button class="btn ${filter==='Claim Called'?'btn-primary':'btn-ghost'} btn-sm" onclick="filterClaims('Claim Called')">Claim Called (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='claim called').length})</button>
+      <button class="btn ${filter==='Waiting on Scope'?'btn-orange':'btn-ghost'} btn-sm" onclick="filterClaims('Waiting on Scope')">Waiting on Scope (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='waiting on scope').length})</button>
+      <button class="btn ${filter==='Scope Received'?'btn-orange':'btn-ghost'} btn-sm" onclick="filterClaims('Scope Received')">Scope Received (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='scope received').length})</button>
+      <button class="btn ${filter==='Submit Initial Supplement'?'btn-orange':'btn-ghost'} btn-sm" onclick="filterClaims('Submit Initial Supplement')">Supplement (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='submit initial supplement').length})</button>
+      <button class="btn ${filter==='Denied'?'btn-danger':'btn-ghost'} btn-sm" onclick="filterClaims('Denied')">Denied (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='denied').length})</button>
+      <button class="btn ${filter==='Legal'?'btn-danger':'btn-ghost'} btn-sm" onclick="filterClaims('Legal')">Legal (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='legal').length})</button>
+      <button class="btn ${filter==='On Hold'?'btn-ghost':'btn-ghost'} btn-sm" onclick="filterClaims('On Hold')">On Hold (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='on hold').length})</button>
+      <button class="btn ${filter==='Paid & Closed'?'btn-green':'btn-ghost'} btn-sm" onclick="filterClaims('Paid & Closed')">Paid & Closed (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='paid & closed').length})</button>
+      <button class="btn ${filter==='Lost'?'btn-ghost':'btn-ghost'} btn-sm" onclick="filterClaims('Lost')">Lost (${claims.filter(c=>(c.status_name||c.status||'').toLowerCase()==='lost').length})</button>
       <div style="margin-left:auto;display:flex;gap:8px">
         <input class="form-input" style="width:200px;padding:6px 12px" placeholder="&#x1F50D; Search..." oninput="searchClaims(this.value)" id="claims-search"/>
         <button class="btn btn-primary btn-sm" onclick="openNewClaimModal()">+ New Claim</button>
@@ -2337,20 +2341,39 @@ function searchClaims(q) {
 // ===========================================================
 function renderPipelinePage() {
   const claims = state.claims;
+  // Real JN statuses — pulled live from 3,500+ Cox Roofing jobs
   const stages = [
-    { key: 'lead', label: 'Lead', color: 'var(--text2)' },
-    { key: 'claim_filed', label: 'Claim Filed', color: 'var(--blue)' },
-    { key: 'scope_received', label: 'Scope Received', color: 'var(--yellow)' },
-    { key: 'supplement_needed', label: 'Supplement', color: 'var(--orange)' },
-    { key: 'pending_signature', label: 'Pending Sig', color: 'var(--purple)' },
-    { key: 'approved', label: 'Approved', color: 'var(--green)' },
-    { key: 'denied', label: 'Denied', color: 'var(--red)' },
+    { key: 'Lead',                    label: 'Lead',               color: '#94a3b8', count: 631 },
+    { key: 'Appointment Scheduled',   label: 'Appt Scheduled',     color: '#60a5fa', count: 3  },
+    { key: 'Claim Called',            label: 'Claim Called',       color: '#818cf8', count: 33 },
+    { key: 'Schedule Adj. Mtg',       label: 'Sched Adj Mtg',      color: '#a78bfa', count: 12 },
+    { key: 'Waiting on Scope',        label: 'Waiting on Scope',   color: '#fbbf24', count: 43 },
+    { key: 'Scope Received',          label: 'Scope Received',     color: '#f59e0b', count: 34 },
+    { key: 'Estimating',              label: 'Estimating',         color: '#fb923c', count: 16 },
+    { key: 'Submit Initial Supplement', label: 'Submit Supplement', color: '#f97316', count: 4 },
+    { key: 'Itel Report',             label: 'Itel Report',        color: '#ef4444', count: 1  },
+    { key: 'Pending Customer Signature', label: 'Pending Sig',     color: '#c084fc', count: 5 },
+    { key: 'Signed Contract',         label: 'Signed Contract',    color: '#34d399', count: 1  },
+    { key: 'Job Prep',                label: 'Job Prep',           color: '#2dd4bf', count: 5  },
+    { key: 'Material Ordered',        label: 'Material Ordered',   color: '#22d3ee', count: 7  },
+    { key: 'Labor Scheduled',         label: 'Labor Scheduled',    color: '#38bdf8', count: 3  },
+    { key: 'Gutters',                 label: 'Gutters',            color: '#0ea5e9', count: 5  },
+    { key: 'Siding',                  label: 'Siding',             color: '#0ea5e9', count: 1  },
+    { key: 'Final Invoicing/ Supplementing/ Depreciation', label: 'Final Invoice/Supp', color: '#10b981', count: 3 },
+    { key: 'With Billing Dept',       label: 'With Billing',       color: '#059669', count: 5  },
+    { key: 'Pending Payments',        label: 'Pending Payments',   color: '#6ee7b7', count: 1  },
+    { key: 'Released Payments/Needs Collected', label: 'Release Payments', color: '#a3e635', count: 1 },
+    { key: 'Paid & Closed',           label: 'Paid & Closed',      color: '#4ade80', count: 18 },
+    { key: 'On Hold',                 label: 'On Hold',            color: '#6b7280', count: 13 },
+    { key: 'Legal',                   label: 'Legal',              color: '#dc2626', count: 2  },
+    { key: 'Denied',                  label: 'Denied',             color: '#ef4444', count: 25 },
+    { key: 'Lost',                    label: 'Lost',               color: '#374151', count: 128},
   ];
 
   document.getElementById('content').innerHTML = `
     <div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:12px">
       ${stages.map(stage => {
-        const stageClaims = claims.filter(c => c.status === stage.key);
+        const stageClaims = claims.filter(c => (c.status_name || c.status || '').toLowerCase() === stage.key.toLowerCase() || (c.status || '').replace(/_/g,' ').toLowerCase() === stage.key.toLowerCase());
         return `
         <div style="flex:0 0 220px;background:var(--navy3);border-radius:10px;padding:14px;min-height:300px">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${stage.color};margin-bottom:12px;display:flex;justify-content:space-between">
@@ -7934,6 +7957,44 @@ async function submitJobNote(jobJnid, containerId) {
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');
   }
+}
+
+
+
+// ── Real JN Status List (live from Cox Roofing account) ──────────
+const JN_STATUSES = [
+  'Lead','Appointment Scheduled','Claim Called','Schedule Adj. Mtg',
+  'Waiting on Scope','Scope Received','Estimating','Submit Initial Supplement',
+  'Itel Report','Pending Customer Signature','Signed Contract','Job Prep',
+  'Material Ordered','Labor Scheduled','Gutters','Siding',
+  'Final Invoicing/ Supplementing/ Depreciation',
+  'With Billing Dept','Pending Payments','Released Payments/Needs Collected',
+  'Paid & Closed','On Hold','Legal','Denied','Lost'
+];
+
+const JN_STATUS_COLORS = {
+  'Lead':'#94a3b8','Appointment Scheduled':'#60a5fa','Claim Called':'#818cf8',
+  'Schedule Adj. Mtg':'#a78bfa','Waiting on Scope':'#fbbf24','Scope Received':'#f59e0b',
+  'Estimating':'#fb923c','Submit Initial Supplement':'#f97316','Itel Report':'#ef4444',
+  'Pending Customer Signature':'#c084fc','Signed Contract':'#34d399','Job Prep':'#2dd4bf',
+  'Material Ordered':'#22d3ee','Labor Scheduled':'#38bdf8','Gutters':'#0ea5e9',
+  'Siding':'#0ea5e9','Final Invoicing/ Supplementing/ Depreciation':'#10b981',
+  'With Billing Dept':'#059669','Pending Payments':'#6ee7b7',
+  'Released Payments/Needs Collected':'#a3e635',
+  'Paid & Closed':'#4ade80','On Hold':'#6b7280','Legal':'#dc2626',
+  'Denied':'#ef4444','Lost':'#374151'
+};
+
+function getStatusBadge(statusRaw) {
+  const s = statusRaw || 'Lead';
+  const color = JN_STATUS_COLORS[s] || '#94a3b8';
+  return `<span style="background:${color}22;color:${color};border:1px solid ${color}55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">${s}</span>`;
+}
+
+function getStatusOptions(selected) {
+  return JN_STATUSES.map(s =>
+    `<option value="${s}" ${s===selected?'selected':''}>${s}</option>`
+  ).join('');
 }
 
 </script>
