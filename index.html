@@ -1423,6 +1423,7 @@ function showSigninPanel(){
   document.getElementById('panel-signin').style.display='block';
   document.getElementById('panel-forgot').style.display='none';
   document.getElementById('panel-signup').style.display='none';
+  const pi=document.getElementById('panel-invite'); if(pi) pi.style.display='none';
   setTimeout(()=>{const el=document.getElementById('login-email');if(el)el.focus();},80);
 }
 function showForgotPanel(){
@@ -7995,6 +7996,80 @@ function getStatusOptions(selected) {
   return JN_STATUSES.map(s =>
     `<option value="${s}" ${s===selected?'selected':''}>${s}</option>`
   ).join('');
+}
+
+
+
+function showInvitePanel(token){
+  // Show the login card if not already visible
+  if(!document.getElementById('login-screen')) buildLoginScreen();
+  document.getElementById('panel-signin').style.display='none';
+  document.getElementById('panel-forgot').style.display='none';
+  document.getElementById('panel-signup').style.display='none';
+  document.getElementById('panel-invite').style.display='block';
+  document.getElementById('panel-invite-loading').style.display='block';
+  document.getElementById('panel-invite-form').style.display='none';
+  document.getElementById('panel-invite-error').style.display='none';
+  window._invitePanelToken = token;
+  // Verify the token
+  callFunction('verifyInvite', { token }).then(r => {
+    document.getElementById('panel-invite-loading').style.display='none';
+    if(r.ok && r.user){
+      document.getElementById('inv2-email').value = r.user.email || '';
+      document.getElementById('inv2-name').value  = r.user.full_name || '';
+      window._invitePanelUserId = r.user.id;
+      document.getElementById('panel-invite-form').style.display='block';
+      setTimeout(()=>{ const n=document.getElementById('inv2-name'); if(n&&!n.value) n.focus(); else document.getElementById('inv2-pass').focus(); }, 100);
+    } else {
+      document.getElementById('panel-invite-error').style.display='block';
+    }
+  }).catch(()=>{
+    document.getElementById('panel-invite-loading').style.display='none';
+    document.getElementById('panel-invite-error').style.display='block';
+  });
+}
+
+async function submitInvitePanel(){
+  const name    = document.getElementById('inv2-name')?.value?.trim();
+  const pass    = document.getElementById('inv2-pass')?.value;
+  const confirm = document.getElementById('inv2-confirm')?.value;
+  const msgEl   = document.getElementById('inv2-msg');
+  const btn     = document.getElementById('inv2-btn');
+  msgEl.textContent = '';
+  if(!name){ msgEl.textContent='Please enter your name.'; return; }
+  if(!pass || pass.length < 6){ msgEl.textContent='Password must be at least 6 characters.'; return; }
+  if(pass !== confirm){ msgEl.textContent='Passwords do not match.'; return; }
+  btn.textContent='Creating account...'; btn.disabled=true;
+  try {
+    const r = await callFunction('acceptInvite', {
+      token: window._invitePanelToken,
+      user_id: window._invitePanelUserId,
+      full_name: name,
+      password: pass
+    });
+    if(r.ok){
+      msgEl.style.color='#15803D';
+      msgEl.textContent='Account activated! Signing you in...';
+      setTimeout(()=>{
+        // Auto-login
+        const emailEl = document.getElementById('inv2-email');
+        if(emailEl){
+          document.getElementById('login-email') && (document.getElementById('login-email').value = emailEl.value);
+        }
+        // Store session if returned
+        if(r.user){ state.user=r.user; localStorage.setItem('cd_user', JSON.stringify(r.user)); }
+        // Remove invite screen and load app
+        const ls=document.getElementById('login-screen'); if(ls) ls.remove();
+        initApp();
+      }, 1200);
+    } else {
+      msgEl.style.color='#B22234';
+      msgEl.textContent = r.error || 'Activation failed. Try again.';
+    }
+  } catch(e){
+    msgEl.style.color='#B22234';
+    msgEl.textContent = e.message;
+  } finally { btn.textContent='Create Account →'; btn.disabled=false; }
 }
 
 </script>
