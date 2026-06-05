@@ -1855,14 +1855,16 @@ async function callFunction(name, payload = {}) {
 }
 
 async function entityList(entity, query = {}) {
-  const url = new URL(`${BASE_URL}/entities/${entity}`);
-  if (Object.keys(query).length) url.searchParams.set('filter', JSON.stringify(query));
-  url.searchParams.set('limit', '500');
-  const res = await fetch(url.toString(), { credentials: 'omit' });
-  if (!res.ok) return [];
-  const d = await res.json();
-  return Array.isArray(d) ? d : (d.records || []);
+  try {
+    const res = await callFunction('entityFetch', { entity, query, limit: 500 });
+    if (res && res.ok) return res.records || [];
+    return [];
+  } catch (e) {
+    console.warn('entityList error:', entity, e);
+    return [];
+  }
 }
+
 
 async function entityCreate(entity, data) {
   const res = await fetch(`${BASE_URL}/entities/${entity}`, {
