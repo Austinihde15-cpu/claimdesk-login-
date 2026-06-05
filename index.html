@@ -1414,6 +1414,42 @@ function buildLoginScreen(mode){
       <div style="margin-top:16px;font-size:12px;color:#94A3B8;text-align:center;">Your admin will send you a personalized invite link.</div>
     </div>
 
+
+    <!-- CREATE ACCOUNT PANEL (invite activation) -->
+    <div id="panel-invite" style="display:none;">
+      <div style="margin-bottom:20px;">
+        <div style="font-size:20px;font-weight:900;color:#001A40;margin-bottom:5px;">&#x1F511; Create Your Password</div>
+        <div style="font-size:13px;color:#64748B;">You have been invited to ClaimDesk. Set a password to activate your account.</div>
+      </div>
+      <div id="panel-invite-loading" style="text-align:center;padding:16px;color:#64748B;">
+        <div style="width:24px;height:24px;border:3px solid #1345A8;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 10px;"></div>
+        Verifying your invite link...
+      </div>
+      <div id="panel-invite-form" style="display:none;">
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 13px;margin-bottom:16px;font-size:12px;color:#1345A8;font-weight:600;">
+          &#x2705; Invite verified &#x2014; set your password below
+        </div>
+        <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Your Name</label>
+        <input id="inv2-name" type="text" placeholder="Full Name" style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;box-sizing:border-box;" onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+        <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Email</label>
+        <input id="inv2-email" type="email" readonly style="width:100%;padding:12px 14px;background:#F1F5F9;border:1.5px solid #E2E8F0;border-radius:9px;color:#64748B;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;cursor:not-allowed;box-sizing:border-box;">
+        <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Choose Password</label>
+        <input id="inv2-pass" type="password" placeholder="Choose a password" style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;box-sizing:border-box;" onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+        <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Confirm Password</label>
+        <input id="inv2-confirm" type="password" placeholder="Confirm your password" style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:18px;font-family:inherit;box-sizing:border-box;" onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+        <button onclick="submitInvitePanel()" id="inv2-btn" style="width:100%;padding:13px;background:linear-gradient(135deg,#15803D,#14532D);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(21,128,61,0.28);font-family:inherit;letter-spacing:.01em;">
+          Create Account &#x2192;
+        </button>
+        <div id="inv2-msg" style="font-size:13px;text-align:center;margin-top:10px;min-height:18px;color:#B22234;font-weight:600;"></div>
+      </div>
+      <div id="panel-invite-error" style="display:none;text-align:center;padding:16px;">
+        <div style="font-size:32px;margin-bottom:8px;">&#x274C;</div>
+        <div style="font-weight:700;color:#B22234;margin-bottom:6px;">Invalid or Expired Invite</div>
+        <div style="font-size:13px;color:#64748B;margin-bottom:14px;">This invite link has already been used or expired.</div>
+        <button onclick="showSigninPanel()" style="background:none;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 0;width:100%;font-size:13px;font-weight:600;color:#475569;cursor:pointer;font-family:inherit;">Back to Sign In</button>
+      </div>
+    </div>
+
   </div>`;
   document.body.appendChild(d);
   setTimeout(()=>{ const el=document.getElementById('login-email'); if(el) el.focus(); }, 100);
@@ -1808,12 +1844,15 @@ async function init(){
   try {
     // ---- Detect invite token in URL ----
     const urlParams = new URLSearchParams(window.location.search);
-    const inviteToken = urlParams.get('token');
+    let inviteToken = urlParams.get('token');
     const companyParam = urlParams.get('company') || 'Cox Roofing';
+    if (!inviteToken) {
+      const hashMatch = window.location.hash.match(/^#invite\/(.+)$/);
+      if (hashMatch) inviteToken = hashMatch[1];
+    }
     if (inviteToken) {
-      document.getElementById('sidebar').style.display = 'none';
-      document.getElementById('main').style.display = 'none';
-      buildInviteScreen(inviteToken, decodeURIComponent(companyParam));
+      buildLoginScreen();
+      showInvitePanel(inviteToken);
       return;
     }
     // ---- Normal session check ----
