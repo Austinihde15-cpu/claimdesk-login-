@@ -2997,6 +2997,12 @@ function renderSettingsPage(activeTab) {
       </div>
     </div>
   `;
+  setTimeout(()=>{
+    if(tab==='users')   loadUsersTab();
+    if(tab==='reports') loadReportsTab();
+    if(tab==='billing') loadBillingTab();
+    if(tab==='admin')   loadAdminStats();
+  }, 80);
 }
 
 // ── PROFILE TAB ──────────────────────────────────────────────
