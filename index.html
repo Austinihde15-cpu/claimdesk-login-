@@ -1244,6 +1244,10 @@ input[type=file] { display: none; }
     <div class="nav-item" onclick="goto('tasks')" id="nav-tasks">
       <span>&#x2705;</span><span>Tasks</span><span class="badge red" id="badge-tasks"></span>
     </div>
+    <div class="nav-section">Schedule</div>
+    <div class="nav-item" onclick="goto('calendar')" id="nav-calendar">
+      <span>&#x1F4C5;</span><span>Calendar</span>
+    </div>
     <div class="nav-section">Field</div>
     <div class="nav-item" onclick="goto('photochecklist')" id="nav-photochecklist">
       <span>&#x1F4F8;</span><span>Crew Checklist</span>
@@ -1892,7 +1896,7 @@ function goto(page, param) {
   const nav = document.getElementById('nav-' + page);
   if (nav) nav.classList.add('active');
   state.page = page;
-  const titles = { dashboard:'Dashboard', claims:'Claims', tasks:'Tasks', settings:'Settings', docbuilder:'Document Builder', photochecklist:'Crew Photo Checklist' };
+  const titles = { dashboard:'Dashboard', claims:'Claims', tasks:'Tasks', calendar:'Calendar', settings:'Settings', docbuilder:'Document Builder', photochecklist:'Crew Photo Checklist' };
   document.getElementById('topbar-title').textContent = titles[page] || 'ClaimDesk';
   if (page === 'dashboard') loadDashboard();
   else if (page === 'claims') renderClaimsPage();
@@ -1900,6 +1904,7 @@ function goto(page, param) {
   else if (page === 'settings') { renderSettingsPage(); setTimeout(loadSettingsTabData, 100); }
   else if (page === 'docbuilder') renderDocBuilderPage();
   else if (page === 'photochecklist') renderPhotoChecklistPage();
+  else if (page === 'calendar') renderCalendarPage();
   else if (page === 'claim') openClaimDetail(param);
 }
 
@@ -4509,70 +4514,8 @@ function renderDocBuilderPage() {
 
   <!-- MATERIAL ORDER -->
   <div class="doc-panel" id="panel-matorder">
-    <div class="card"><div class="card-header"><span class="card-title">&#x1F4E6; Material Order Builder</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="clearMO()">&#x1F5D1; Clear</button>
-        <button class="btn btn-primary btn-sm" onclick="printMO()">&#x1F5A8; Print/PDF</button>
-      </div></div>
-      <div class="card-body">
-        <div class="doc-header-form">
-          <div><label class="form-label">Client Name</label><input class="form-input" id="mo-client" placeholder="Homeowner Name"/></div>
-          <div><label class="form-label">Address</label><input class="form-input" id="mo-addr" placeholder="Job Address"/></div>
-          <div><label class="form-label">Order #</label><input class="form-input" id="mo-num" placeholder="1384"/></div>
-          <div><label class="form-label">Order Date</label><input class="form-input" type="date" id="mo-date" value="${new Date().toISOString().slice(0,10)}"/></div>
-          <div><label class="form-label">Delivery Date</label><input class="form-input" type="date" id="mo-delivery"/></div>
-          <div><label class="form-label">Job Number</label><input class="form-input" id="mo-job" placeholder="JN Job #"/></div>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Add Materials</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;margin-bottom:12px;align-items:flex-end">
-          <div><label class="form-label">Category</label>
-            <select class="form-input" id="mo-trade" onchange="updateMOTrade()">
-              <option value="roofing_shingles">Roofing -- Shingles</option>
-              <option value="roofing_underlayment">Roofing -- Underlayment</option>
-              <option value="roofing_icewater">Roofing -- Ice & Water</option>
-              <option value="roofing_ridge">Roofing -- Ridge Cap</option>
-              <option value="roofing_starter">Roofing -- Starter Strip</option>
-              <option value="roofing_ventilation">Roofing -- Ventilation</option>
-              <option value="roofing_flashing">Roofing -- Flashing / Metal</option>
-              <option value="roofing_decking">Roofing -- Decking / Hardware</option>
-              <option value="roofing_flatroof">Roofing -- Flat Roof Systems</option>
-              <option value="gutters">Gutters & Downspouts</option>
-              <option value="siding">Siding & Accessories</option>
-              <option value="windows">Windows</option>
-              <option value="doors">Doors</option>
-            </select></div>
-          <div><label class="form-label">Item</label><select class="form-input" id="mo-product" onchange="updateMOProduct()"></select></div>
-          <div><label class="form-label">Description / Notes</label><input class="form-input" id="mo-desc" placeholder="Auto-filled"/></div>
-          <div><label class="form-label">Unit Price</label><input class="form-input" id="mo-price" type="number" step="0.01" placeholder="0.00"/></div>
-          <div><label class="form-label">Qty</label><input class="form-input" id="mo-qty" type="number" step="0.01" placeholder="1"/></div>
-        </div>
-        <button class="add-line-btn" onclick="addLineToMO()">&#xFF0B; Add to Order</button>
-        <button class="add-line-btn" style="margin-left:8px" onclick="addStandardRoofKit()">&#x26A1; Standard Roof Kit</button>
-        <hr style="border-color:var(--border);margin:16px 0">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:14px;font-weight:700">Order Items</div>
-          <button class="btn btn-ghost btn-sm" onclick="addBlankMOLine()">&#xFF0B; Blank Line</button>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="mo-table">
-            <thead><tr><th>Item / Brand</th><th>Description</th><th>UOM</th><th>Qty</th><th>Cost</th><th>Price</th><th>Amount</th><th></th></tr></thead>
-            <tbody id="mo-lines"><tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px">No items yet</td></tr></tbody>
-          </table>
-        </div>
-        <div class="totals-box">
-          <div class="totals-row"><span class="label">Total Cost</span><span class="val" id="mo-total-cost">$0.00</span></div>
-          <div class="totals-row"><span class="label">Sales Tax (9.679%)</span><span class="val" id="mo-tax">$0.00</span></div>
-          <div class="totals-row"><span>Total Price</span><span id="mo-grand">$0.00</span></div>
-        </div>
-        <div style="margin-top:16px">
-          <label class="form-label">Special Instructions</label>
-          <textarea class="form-input" id="mo-notes" rows="3" placeholder="Delivery notes, special handling, call Austin on arrival..."></textarea>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="printMO()">&#x1F5A8; Print / Export PDF</button>
-          <button class="btn btn-ghost" onclick="copyMOText()">&#x1F4CB; Copy as Text</button>
-        </div>
-      </div></div>
+    <script>if(typeof window._moLines==="undefined")window._moLines=[];<\/script>
+    <div id="mo-panel-inner"></div>
   </div>
 
   <!-- WORK ORDER -->
@@ -5790,6 +5733,1607 @@ function randyCopy(){
     setTimeout(()=>btn.textContent='Copy to clipboard',2000);
   });
 }
+
+
+// ============================================================
+// SHINGLE CATALOG + SUPPLIER CATALOG + MATERIAL TEMPLATES
+// ============================================================
+// ============================================================
+//  SHINGLE CATALOG — Brand → Style → Colors
+//  All major brands, full color lines as of 2025-2026
+// ============================================================
+const SHINGLE_CATALOG = {
+  "GAF": {
+    styles: {
+      "Timberline HDZ": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Appalachian Sky","Barkwood","Birchwood","Biscayne Blue","Black Walnut",
+          "Birch","Camelot II","Canyon Brown","Cappuccino","Charcoal","Copper Canyon",
+          "Driftwood","Dusky Violet","Fox Hollow Gray","Grand Canyon","Hickory",
+          "Hunter Green","Mission Brown","Morning Frost","Natural Shadow","Oyster Gray",
+          "Pewter Gray","Ponderosa","Rocky Mountain Sky","Royal Slate","Rustic Black",
+          "Rustic Cedar","Rustic Redwood","Shadow Black","Shakewood","Silver Lining",
+          "Slate Rustic","Stonewood","Storm Cloud Gray","Sunrise","Tan","Ultra White",
+          "Weathered Gray","Weathered Wood","White Birch","Williamsburg Slate",
+          "Woodberry","Woodland Evergreen","Yale Brick"
+        ]
+      },
+      "Timberline CS (Cool Series)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Charcoal","Barkwood","Hickory","Pewter Gray","Weathered Wood","Driftwood",
+          "Mission Brown","Fox Hollow Gray"
+        ]
+      },
+      "Timberline UHD (Ultra HD)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Barkwood","Birchwood","Charcoal","Driftwood","Hickory","Mission Brown",
+          "Oyster Gray","Pewter Gray","Shakewood","Weathered Wood"
+        ]
+      },
+      "Timberline UHDZ": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Barkwood","Birchwood","Charcoal","Driftwood","Hickory","Mission Brown",
+          "Pewter Gray","Shakewood","Weathered Wood","Grand Sequoia","Cedar Falls",
+          "Blue Ridge","Mountain Peak","Antique Slate","Somerset Blue"
+        ]
+      },
+      "Camelot II (Luxury)": {
+        class: "luxury",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Birchwood","Biscayne Blue","Charcoal","Connecticut Slate",
+          "Golden Cedar","Granite Gray","Mission Brown","Pewter Gray","Royal Slate",
+          "Slate Rustic","Williamsburg Slate","Autumn Harvest"
+        ]
+      },
+      "Grand Sequoia (Luxury)": {
+        class: "luxury",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Appalachian Sky","Barkwood","Birchwood","Charcoal","Country Mansion",
+          "Driftwood","Grand Canyon","Hickory","Hunter Green","Mountain Peak",
+          "Pewter Gray","Rocky Mountain Sky","Shakewood"
+        ]
+      },
+      "Woodland (Designer)": {
+        class: "designer",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Autumn Harvest","Birchwood","Burnt Sienna","Charcoal","Country Mansion",
+          "Driftwood","Golden Cedar","Hickory","Mission Brown","Pewter Gray","Sahara Sand"
+        ]
+      },
+      "Slateline (Designer)": {
+        class: "designer",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Copper Canyon","Emerald Pearl","Golden Amber","Mission Brown",
+          "Royal Slate","Victorian Blue","Williamsburg Slate"
+        ]
+      },
+      "3-Tab Royal Sovereign": {
+        class: "3tab",
+        warranty: "25 Year",
+        colors: [
+          "Charcoal","Storm Gray","White","Silver Gray","Weathered Wood",
+          "Barkwood","Desert Tan","Onyx Black"
+        ]
+      }
+    }
+  },
+
+  "Owens Corning": {
+    styles: {
+      "Duration (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Aged Copper","Antique Silver","Barkwood","Black Satin","Brownwood",
+          "Burgandy","Chateau Green","Chateau Red","Chestnut","Colonial Slate",
+          "Driftwood","Estate Gray","Harbor Blue","Harvest Gold","Kalahari Tan",
+          "Merlot","Mission Brown","Musket Brown","Onyx Black","Pacific Wave",
+          "Quarry Gray","Regal Black","Regal Blue","Sequoia","Sierra Gray",
+          "Slatestone Gray","Sunset Gray","Teak","Tidal Pool","Vintage Weathered Oak",
+          "White Birch","Williamsburg Gray","Wood Stock Brown"
+        ]
+      },
+      "Duration FLEX (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Silver","Barkwood","Black Satin","Driftwood","Estate Gray",
+          "Musket Brown","Onyx Black","Regal Black","Slatestone Gray","Teak"
+        ]
+      },
+      "Duration Storm (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Silver","Barkwood","Driftwood","Estate Gray","Harvest Gold",
+          "Mission Brown","Musket Brown","Onyx Black","Slatestone Gray"
+        ]
+      },
+      "TruDefinition Duration (Shades)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Aged Copper","Antique Silver","Barkwood","Black Satin","Brownwood",
+          "Driftwood","Estate Gray","Harbor Blue","Mission Brown","Musket Brown",
+          "Onyx Black","Quarry Gray","Slatestone Gray","Teak","Vintage Weathered Oak"
+        ]
+      },
+      "Oakridge (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Aged Copper","Autumn Brown","Barkwood","Black Max","Brownwood","Chateau Green",
+          "Driftwood","Estate Gray","Harbor Blue","Mission Brown","Onyx Black",
+          "Quarry Gray","Shakewood","Sierra Gray","Slatestone Gray","Teak"
+        ]
+      },
+      "Berkshire Collection (Luxury)": {
+        class: "luxury",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Silver","Brownwood","Estate Gray","Mission Brown","Onyx Black",
+          "Teak","Quarry Gray"
+        ]
+      },
+      "Woodcrest (Designer)": {
+        class: "designer",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Autumn Harvest","Cedar","Driftwood","Harvest Gold","Mission Brown",
+          "Onyx Black","Pacific Wave","Sierra Gray"
+        ]
+      },
+      "3-Tab Supreme / Classic": {
+        class: "3tab",
+        warranty: "25 Year",
+        colors: [
+          "Onyx Black","Teak","Driftwood","Estate Gray","Slatestone Gray",
+          "Mission Brown","Harbor Blue"
+        ]
+      }
+    }
+  },
+
+  "CertainTeed": {
+    styles: {
+      "Landmark (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Autumn Blend","Birchwood","Black Walnut","Brownwood","Burnt Sienna",
+          "Canyon Sunset","Cape Cod Gray","Cedar Shake","Charcoal Black",
+          "Driftwood Gray","Georgetown Gray","Grand Manor Clay","Hunter Green",
+          "Iron Gray","Landmark Granite","Moire Black","Natural Shadow",
+          "New Earthen Blend","Northgate Gray","Oyster Gray","Pewter","Presidential Shake",
+          "Resawn Shake","Resawn Shake Gray","Shadow Gray","Shakewood Brown",
+          "Shasta White","Sierra Gray","Slate Gray","Weathered Wood","Weathered Woodlands"
+        ]
+      },
+      "Landmark Pro (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Birchwood","Brownwood","Burnt Sienna","Cape Cod Gray","Cedar Shake",
+          "Charcoal Black","Driftwood Gray","Georgetown Gray","Iron Gray","Moire Black",
+          "Oyster Gray","Pewter","Shadow Gray","Shasta White","Sierra Gray",
+          "Slate Gray","Weathered Wood"
+        ]
+      },
+      "Landmark IR (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Birchwood","Cape Cod Gray","Cedar Shake","Charcoal Black","Driftwood Gray",
+          "Georgetown Gray","Iron Gray","Moire Black","Oyster Gray","Shadow Gray",
+          "Sierra Gray","Weathered Wood"
+        ]
+      },
+      "Landmark Premium (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Birchwood","Cape Cod Gray","Cedar Shake","Charcoal Black","Driftwood Gray",
+          "Georgetown Gray","Moire Black","Oyster Gray","Shadow Gray","Sierra Gray"
+        ]
+      },
+      "Presidential Shake (Luxury)": {
+        class: "luxury",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Autumn Blend","Birchwood","Brownwood","Cape Cod Gray","Cedar","Charcoal Black",
+          "Driftwood Gray","Georgetown Gray","Iron Gray","Moire Black","Natural Cedar",
+          "Oyster Gray","Shadow Gray","Sierra Gray","Weathered Wood"
+        ]
+      },
+      "Presidential TL (Luxury)": {
+        class: "luxury",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Birchwood","Cape Cod Gray","Cedar Shake","Charcoal Black","Driftwood Gray",
+          "Georgetown Gray","Moire Black","Oyster Gray","Shadow Gray","Sierra Gray"
+        ]
+      },
+      "Grand Manor (Designer)": {
+        class: "designer",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Black","Birchwood","Burnt Sienna","Cape Cod Gray","Cedar Shake",
+          "Charcoal Black","Driftwood Gray","Georgetown Gray","Iron Gray","Moire Black",
+          "Oyster Gray","Shadow Gray","Sierra Gray"
+        ]
+      },
+      "3-Tab XT25": {
+        class: "3tab",
+        warranty: "25 Year",
+        colors: [
+          "Charcoal Black","Georgetown Gray","Oyster Gray","Shadow Gray","Weathered Wood"
+        ]
+      }
+    }
+  },
+
+  "Atlas": {
+    styles: {
+      "StormMaster Shake (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Appalachian Brown","Autumn Harvest","Barkwood","Birchwood",
+          "Black","Brownwood","Burnt Sienna","Canyon Chestnut","Cedar Brown","Charcoal",
+          "Coffee Brown","Colonial Slate","Driftwood","Hazel Brown","Iron Gray","Leather",
+          "Mountain Cedar","Natural Weathered Wood","Oyster Gray","Pewter Gray",
+          "Sahara Sand","Sandcastle","Shadow Gray","Sierra Brown","Slatestone Gray",
+          "Stone Gray","Summer Gray","Teak","Timber Brown","Victorian Gray",
+          "Weathered Wood","White Birch"
+        ]
+      },
+      "StormMaster Tile (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Barkwood","Birchwood","Charcoal","Driftwood","Iron Gray",
+          "Pewter Gray","Shadow Gray","Slatestone Gray","Weathered Wood"
+        ]
+      },
+      "Pinnacle Pristine (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Appalachian Brown","Barkwood","Birchwood","Canyon Chestnut",
+          "Charcoal","Driftwood","Iron Gray","Oyster Gray","Pewter Gray","Shadow Gray",
+          "Slatestone Gray","Weathered Wood"
+        ]
+      },
+      "Pro-Cut (3-Tab)": {
+        class: "3tab",
+        warranty: "25 Year",
+        colors: [
+          "Charcoal","Driftwood","Pewter Gray","Shadow Gray","Weathered Wood"
+        ]
+      }
+    }
+  },
+
+  "IKO": {
+    styles: {
+      "Dynasty (Impact Resistant)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Arctic White","Blue Spruce","Blue Storm","Bronze Wood","Cambridge Gray",
+          "Canyon Dusk","Charcoal Gray","Country Mansion","Desert Tan","Dusk Brown",
+          "Estate Gray","Foxfire","Glacier Blue","Harvest Gold","Heritage Autumn",
+          "Heritage Brown","Heritage Cedar","Ironwood","Mineral Green","Midnight Black",
+          "Morning Mist","Mystic Black","Oyster Gray","Pewter Gray","Prairie Grass",
+          "River Rock","Rocky Mountain Gray","Rustic Black","Rustic Brown","Rustic Cedar",
+          "Sand Dune","Sealed Brown","Silvered Timber","Slatestone Gray","Sunset Brown",
+          "Timber Brown","Weather Moss","Weathered Wood"
+        ]
+      },
+      "Cambridge (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Arctic White","Blue Storm","Charcoal Gray","Country Mansion","Desert Tan",
+          "Estate Gray","Glacial Blue","Harvest Gold","Ironwood","Midnight Black",
+          "Oyster Gray","Pewter Gray","Rustic Black","Rustic Cedar","Slatestone Gray",
+          "Weathered Wood"
+        ]
+      },
+      "Nordic (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Charcoal Gray","Country Mansion","Estate Gray","Midnight Black",
+          "Pewter Gray","Rustic Black","Slatestone Gray","Weathered Wood"
+        ]
+      }
+    }
+  },
+
+  "Malarkey": {
+    styles: {
+      "Vista AR (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Aged Redwood","Birchwood","Black","Brownwood","Cape Cod",
+          "Cascade","Cedar Shake","Charcoal","Driftwood","Hearthstone","Iron Gray",
+          "Midnight Black","Mission Brown","Mossy Earth","Natural Gray","Pewter",
+          "Quarry Gray","Shadow","Shakewood","Sierra Gray","Slate Gray","Weathered Wood"
+        ]
+      },
+      "Legacy AR (Architectural)": {
+        class: "architectural",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Brownwood","Cape Cod","Charcoal","Driftwood","Iron Gray",
+          "Mission Brown","Pewter","Shadow","Sierra Gray","Weathered Wood"
+        ]
+      },
+      "Windsor AR (Designer)": {
+        class: "designer",
+        warranty: "Limited Lifetime",
+        colors: [
+          "Antique Slate","Cape Cod","Cedar Shake","Charcoal","Driftwood","Iron Gray",
+          "Mission Brown","Shadow","Sierra Gray"
+        ]
+      }
+    }
+  }
+};
+
+// ============================================================
+//  SUPPLIER CATALOG — Supplier → product categories + pricing
+// ============================================================
+const SUPPLIER_CATALOG = {
+  "ABC Supply Co.": {
+    code: "ABC",
+    type: "wholesale",
+    shingles: true, underlayment: true, metal: true, gutters: true, siding: true, accessories: true
+  },
+  "SRS Distribution": {
+    code: "SRS",
+    type: "wholesale",
+    shingles: true, underlayment: true, metal: true, gutters: true, siding: true, accessories: true
+  },
+  "Beacon Building Products": {
+    code: "BEACON",
+    type: "wholesale",
+    shingles: true, underlayment: true, metal: true, gutters: true, siding: true, accessories: true
+  },
+  "Allied Building Products": {
+    code: "ALLIED",
+    type: "wholesale",
+    shingles: true, underlayment: true, metal: true, gutters: true, siding: true, accessories: true
+  },
+  "Lowe's Pro": {
+    code: "LOWES",
+    type: "retail",
+    shingles: true, underlayment: true, metal: false, gutters: true, siding: true, accessories: true
+  },
+  "Home Depot Pro": {
+    code: "HD",
+    type: "retail",
+    shingles: true, underlayment: true, metal: false, gutters: true, siding: true, accessories: true
+  },
+  "Menards": {
+    code: "MENARDS",
+    type: "retail",
+    shingles: true, underlayment: true, metal: false, gutters: true, siding: true, accessories: true
+  }
+};
+
+// ============================================================
+//  MATERIAL TEMPLATES — Full component lists per system type
+// ============================================================
+const MATERIAL_TEMPLATES = {
+  "Full Roof Replacement (Shingle)": {
+    description: "Complete tear-off & re-roof with architectural shingles",
+    components: [
+      { category: "shingles",       item: "Architectural Shingles",          unit: "SQ",  qty_formula: "squares" },
+      { category: "starter",        item: "Starter Strip (Eaves)",           unit: "SQ",  qty_formula: "eave_lf / 3.33" },
+      { category: "starter",        item: "Starter Strip (Rakes)",           unit: "LF",  qty_formula: "rake_lf" },
+      { category: "icewater",       item: "Ice & Water Shield (2 Course)",   unit: "SQ",  qty_formula: "eave_lf * 6 / 100" },
+      { category: "underlayment",   item: "Synthetic Underlayment",          unit: "SQ",  qty_formula: "squares" },
+      { category: "ridge",          item: "Hip & Ridge Cap",                 unit: "LF",  qty_formula: "hip_lf + ridge_lf" },
+      { category: "drip_edge",      item: "Drip Edge (Eaves)",               unit: "LF",  qty_formula: "eave_lf" },
+      { category: "drip_edge",      item: "Drip Edge (Rakes)",               unit: "LF",  qty_formula: "rake_lf" },
+      { category: "ventilation",    item: "Ridge Vent",                      unit: "LF",  qty_formula: "ridge_lf" },
+      { category: "nails",          item: "Coil Nails (1-3/4\")",            unit: "BOX", qty_formula: "Math.ceil(squares / 4)" },
+      { category: "nails",          item: "Cap Nails (Plastihead)",          unit: "BOX", qty_formula: "Math.ceil(squares / 8)" },
+      { category: "flashing",       item: "Step Flashing",                   unit: "PC",  qty_formula: "0" },
+      { category: "flashing",       item: "Valley Metal (Pre-bent)",         unit: "LF",  qty_formula: "0" },
+      { category: "misc",           item: "Pipe Boot Flashing",              unit: "EA",  qty_formula: "0" },
+      { category: "misc",           item: "Roofing Caulk / Geocel",          unit: "TUB", qty_formula: "1" }
+    ]
+  },
+  "Full Roof Replacement (IWS Only — Mansard)": {
+    description: "Mansard/low-slope using Ice & Water Shield full coverage",
+    components: [
+      { category: "shingles",       item: "Architectural Shingles",          unit: "SQ",  qty_formula: "squares" },
+      { category: "icewater",       item: "Ice & Water Shield (Full Cover)", unit: "SQ",  qty_formula: "squares * 1.1" },
+      { category: "starter",        item: "Starter Strip",                   unit: "SQ",  qty_formula: "perimeter_lf / 33" },
+      { category: "ridge",          item: "Hip & Ridge Cap",                 unit: "LF",  qty_formula: "hip_lf + ridge_lf" },
+      { category: "drip_edge",      item: "Drip Edge",                       unit: "LF",  qty_formula: "perimeter_lf" },
+      { category: "nails",          item: "Coil Nails (1-3/4\")",            unit: "BOX", qty_formula: "Math.ceil(squares / 4)" },
+      { category: "flashing",       item: "Transition Flashing (Mansard)",   unit: "LF",  qty_formula: "transition_lf" },
+      { category: "misc",           item: "Roofing Caulk",                   unit: "TUB", qty_formula: "2" }
+    ]
+  },
+  "Flat Roof (Mod-Bit / TPO)": {
+    description: "Modified bitumen or TPO flat roof system",
+    components: [
+      { category: "flatroof",       item: "Modified Bit (Base Sheet)",       unit: "SQ",  qty_formula: "squares * 1.05" },
+      { category: "flatroof",       item: "Modified Bit (Cap Sheet)",        unit: "SQ",  qty_formula: "squares * 1.05" },
+      { category: "primer",         item: "Asphalt Primer",                  unit: "GAL", qty_formula: "Math.ceil(squares * 0.5)" },
+      { category: "flashing",       item: "Aluminum Coping Cap",             unit: "LF",  qty_formula: "perimeter_lf" },
+      { category: "flashing",       item: "Pipe Flashing (Mod-Bit)",        unit: "EA",  qty_formula: "0" },
+      { category: "misc",           item: "Roof Cement / Plastic",           unit: "GAL", qty_formula: "2" },
+      { category: "misc",           item: "T-Nails / Fasteners",             unit: "BOX", qty_formula: "1" }
+    ]
+  },
+  "Gutters (Seamless Aluminum)": {
+    description: "6\" K-style seamless aluminum gutters and downspouts",
+    components: [
+      { category: "gutters",        item: "6\" K-Style Gutter (per LF)",     unit: "LF",  qty_formula: "gutter_lf" },
+      { category: "gutters",        item: "3x4\" Downspout",                 unit: "LF",  qty_formula: "downspout_lf" },
+      { category: "gutters",        item: "Gutter End Caps (L/R)",           unit: "PR",  qty_formula: "0" },
+      { category: "gutters",        item: "Inside Corner",                   unit: "EA",  qty_formula: "0" },
+      { category: "gutters",        item: "Outside Corner",                  unit: "EA",  qty_formula: "0" },
+      { category: "gutters",        item: "Downspout Elbow (A)",             unit: "EA",  qty_formula: "0" },
+      { category: "gutters",        item: "Downspout Elbow (B)",             unit: "EA",  qty_formula: "0" },
+      { category: "gutters",        item: "Splash Block",                    unit: "EA",  qty_formula: "0" },
+      { category: "gutters",        item: "Gutter Hanger / Spike",           unit: "BOX", qty_formula: "Math.ceil(gutter_lf / 24)" },
+      { category: "gutters",        item: "Gutter Helmet / Leaf Guard",      unit: "LF",  qty_formula: "0" },
+      { category: "gutters",        item: "Sealant",                         unit: "CTG", qty_formula: "1" }
+    ]
+  },
+  "Vinyl Siding (Full House)": {
+    description: "Full vinyl siding replacement with trim and accessories",
+    components: [
+      { category: "siding",         item: "Vinyl Siding Panels",             unit: "SQ",  qty_formula: "siding_sq" },
+      { category: "siding",         item: "J-Channel",                       unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "F-Channel",                       unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "Outside Corner Post",             unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "Inside Corner Post",              unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "Starter Strip",                   unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "Undersill Trim",                  unit: "PC",  qty_formula: "0" },
+      { category: "siding",         item: "Window Trim (Flat)",              unit: "PC",  qty_formula: "0" },
+      { category: "fascia",         item: "Fascia Board (Aluminum Wrap)",    unit: "LF",  qty_formula: "0" },
+      { category: "soffit",         item: "Soffit Panel (Vented)",           unit: "SQ",  qty_formula: "0" },
+      { category: "soffit",         item: "Soffit F-Channel",                unit: "PC",  qty_formula: "0" },
+      { category: "misc",           item: "Nails (Siding Coil)",             unit: "BOX", qty_formula: "1" },
+      { category: "misc",           item: "House Wrap (Tyvek)",              unit: "SQ",  qty_formula: "siding_sq" }
+    ]
+  },
+  "Fascia & Soffit Only": {
+    description: "Aluminum wrap fascia and vinyl soffit replacement",
+    components: [
+      { category: "fascia",         item: "Aluminum Fascia Coil (Wrap)",     unit: "SQ",  qty_formula: "0" },
+      { category: "soffit",         item: "Soffit Panel (Vented)",           unit: "SQ",  qty_formula: "0" },
+      { category: "soffit",         item: "Soffit F-Channel",                unit: "PC",  qty_formula: "0" },
+      { category: "misc",           item: "Aluminum Trim Nails",             unit: "BOX", qty_formula: "1" },
+      { category: "misc",           item: "Color-matched Caulk",             unit: "CTG", qty_formula: "1" }
+    ]
+  }
+};
+
+// ============================================================
+//  NON-SHINGLE MATERIAL CATALOG
+// ============================================================
+const MATERIAL_CATALOG = {
+  "roofing_underlayment": [
+    { name:"GAF FeltBuster Synthetic",           brand:"GAF",         unit:"SQ",  cost:8.50  },
+    { name:"GAF Tiger Paw",                      brand:"GAF",         unit:"SQ",  cost:12.00 },
+    { name:"Owens Corning ProArmor",             brand:"OC",          unit:"SQ",  cost:9.50  },
+    { name:"Owens Corning WeatherLock Flex",     brand:"OC",          unit:"SQ",  cost:14.00 },
+    { name:"CertainTeed DiamondDeck",            brand:"CertainTeed", unit:"SQ",  cost:11.00 },
+    { name:"Atlas Summit Pro SA",                brand:"Atlas",       unit:"SQ",  cost:10.50 },
+    { name:"TYPAR Roof Deck 30",                 brand:"TYPAR",       unit:"SQ",  cost:9.00  },
+    { name:"15# Felt",                           brand:"Generic",     unit:"SQ",  cost:4.50  },
+    { name:"30# Felt",                           brand:"Generic",     unit:"SQ",  cost:7.00  }
+  ],
+  "roofing_icewater": [
+    { name:"GAF WeatherWatch (36\")",            brand:"GAF",         unit:"SQ",  cost:38.00 },
+    { name:"GAF StormGuard (36\")",              brand:"GAF",         unit:"SQ",  cost:42.00 },
+    { name:"Owens Corning WeatherLock G",        brand:"OC",          unit:"SQ",  cost:36.00 },
+    { name:"CertainTeed WinterGuard HS",         brand:"CertainTeed", unit:"SQ",  cost:40.00 },
+    { name:"Atlas Ice & Water Barrier",          brand:"Atlas",       unit:"SQ",  cost:35.00 },
+    { name:"Henry 790 Ice & Water",              brand:"Henry",       unit:"SQ",  cost:37.00 }
+  ],
+  "roofing_ridge": [
+    { name:"GAF TimberTex Premium Ridge",        brand:"GAF",         unit:"LF",  cost:2.20  },
+    { name:"GAF Seal-A-Ridge",                   brand:"GAF",         unit:"LF",  cost:1.60  },
+    { name:"OC Owens Corning Hip & Ridge",       brand:"OC",          unit:"LF",  cost:1.80  },
+    { name:"CertainTeed XT Ridge",               brand:"CertainTeed", unit:"LF",  cost:1.75  },
+    { name:"Atlas Ridge",                        brand:"Atlas",       unit:"LF",  cost:1.65  }
+  ],
+  "roofing_starter": [
+    { name:"GAF ProStart Starter Strip",         brand:"GAF",         unit:"LF",  cost:0.80  },
+    { name:"GAF WeatherBlocker Starter",         brand:"GAF",         unit:"LF",  cost:0.75  },
+    { name:"OC Starter Strip Plus",              brand:"OC",          unit:"LF",  cost:0.85  },
+    { name:"CertainTeed SwiftStart",             brand:"CertainTeed", unit:"LF",  cost:0.90  }
+  ],
+  "roofing_ventilation": [
+    { name:"GAF Cobra Ridge Vent 3",             brand:"GAF",         unit:"LF",  cost:3.20  },
+    { name:"GAF Master Flow PRV 36",             brand:"GAF",         unit:"EA",  cost:22.00 },
+    { name:"GAF Lomanco BIR 750",                brand:"GAF",         unit:"EA",  cost:18.00 },
+    { name:"OC VentSure Ridge Vent",             brand:"OC",          unit:"LF",  cost:3.50  },
+    { name:"Air Vent ShingleVent II",            brand:"Air Vent",    unit:"LF",  cost:3.75  },
+    { name:"Cor-A-Vent V-10",                   brand:"Cor-A-Vent",  unit:"LF",  cost:3.00  },
+    { name:"Box Vent (Mill Finish)",             brand:"Generic",     unit:"EA",  cost:8.00  },
+    { name:"Pipe Boot Flashing (Lead)",          brand:"Generic",     unit:"EA",  cost:12.00 },
+    { name:"Pipe Boot (Rubber, 2\")",            brand:"Generic",     unit:"EA",  cost:9.00  },
+    { name:"Pipe Boot (Rubber, 3\")",            brand:"Generic",     unit:"EA",  cost:10.00 }
+  ],
+  "roofing_flashing": [
+    { name:"Step Flashing 4x4x8 (Alum)",        brand:"Generic",     unit:"PC",  cost:1.10  },
+    { name:"Step Flashing 4x4x8 (Galv)",        brand:"Generic",     unit:"PC",  cost:0.95  },
+    { name:"Valley Metal Pre-Bent (10')",        brand:"Generic",     unit:"LF",  cost:2.80  },
+    { name:"Drip Edge 1.5\" (Alum, 10')",       brand:"Generic",     unit:"PC",  cost:4.50  },
+    { name:"Drip Edge 3\" (Alum, 10')",         brand:"Generic",     unit:"PC",  cost:5.50  },
+    { name:"Headwall Flashing",                  brand:"Generic",     unit:"LF",  cost:2.50  },
+    { name:"Skylight Flashing Kit",              brand:"Generic",     unit:"EA",  cost:45.00 },
+    { name:"Chimney Counter Flashing",           brand:"Generic",     unit:"LF",  cost:8.00  }
+  ],
+  "roofing_decking": [
+    { name:"7/16\" OSB (4x8)",                  brand:"Generic",     unit:"SHT", cost:22.00 },
+    { name:"1/2\" OSB (4x8)",                   brand:"Generic",     unit:"SHT", cost:26.00 },
+    { name:"5/8\" OSB (4x8)",                   brand:"Generic",     unit:"SHT", cost:30.00 },
+    { name:"Coil Nails 1-3/4\" Smooth",         brand:"Generic",     unit:"BOX", cost:55.00 },
+    { name:"Coil Nails 2-3/8\" Ring Shank",     brand:"Generic",     unit:"BOX", cost:65.00 },
+    { name:"Cap Nails (Plastihead 1\")",         brand:"Generic",     unit:"BOX", cost:22.00 },
+    { name:"Roofing Screws (1-3/4\")",          brand:"Generic",     unit:"BOX", cost:18.00 }
+  ],
+  "roofing_flatroof": [
+    { name:"Modified Bitumen Base Sheet (SQ)",  brand:"Henry",       unit:"SQ",  cost:28.00 },
+    { name:"Modified Bit Cap Sheet (SQ)",       brand:"Henry",       unit:"SQ",  cost:38.00 },
+    { name:"TPO Membrane 60mil (SQ)",           brand:"Carlisle",    unit:"SQ",  cost:65.00 },
+    { name:"EPDM Membrane 45mil (SQ)",          brand:"Firestone",   unit:"SQ",  cost:55.00 },
+    { name:"Asphalt Primer (5 gal)",            brand:"Henry",       unit:"PAL", cost:85.00 },
+    { name:"Roof Cement (5 gal)",               brand:"Henry",       unit:"PAL", cost:45.00 }
+  ],
+  "gutters": [
+    { name:"6\" K-Style Aluminum (White)",      brand:"Generic",     unit:"LF",  cost:2.50  },
+    { name:"6\" K-Style Aluminum (Brown)",      brand:"Generic",     unit:"LF",  cost:2.50  },
+    { name:"6\" K-Style Aluminum (Musket Brown)",brand:"Generic",    unit:"LF",  cost:2.50  },
+    { name:"6\" K-Style Aluminum (Almond)",     brand:"Generic",     unit:"LF",  cost:2.50  },
+    { name:"5\" K-Style Aluminum (White)",      brand:"Generic",     unit:"LF",  cost:2.10  },
+    { name:"5\" K-Style Aluminum (Brown)",      brand:"Generic",     unit:"LF",  cost:2.10  },
+    { name:"3x4\" Downspout",                   brand:"Generic",     unit:"LF",  cost:1.80  },
+    { name:"2x3\" Downspout",                   brand:"Generic",     unit:"LF",  cost:1.40  },
+    { name:"Gutter Helmet (per LF)",            brand:"Gutter Helmet",unit:"LF", cost:8.00  },
+    { name:"LeafFilter (per LF)",               brand:"LeafFilter",  unit:"LF",  cost:10.00 },
+    { name:"Micro-Mesh Screen",                 brand:"Generic",     unit:"LF",  cost:3.50  },
+    { name:"End Cap (pair)",                    brand:"Generic",     unit:"PR",  cost:3.50  },
+    { name:"Inside Corner",                     brand:"Generic",     unit:"EA",  cost:4.50  },
+    { name:"Outside Corner",                    brand:"Generic",     unit:"EA",  cost:4.50  },
+    { name:"Elbow A",                           brand:"Generic",     unit:"EA",  cost:3.00  },
+    { name:"Elbow B",                           brand:"Generic",     unit:"EA",  cost:3.00  },
+    { name:"Gutter Spike/Hanger",               brand:"Generic",     unit:"BX",  cost:28.00 }
+  ],
+  "siding": [
+    { name:"Vinyl Siding (Double 4\" Dutch Lap)",  brand:"CertainTeed",unit:"SQ", cost:72.00 },
+    { name:"Vinyl Siding (Double 4.5\" Clapboard)",brand:"Alside",    unit:"SQ",  cost:68.00 },
+    { name:"Vinyl Siding (Dutch Lap Premium)",  brand:"Mastic",       unit:"SQ",  cost:80.00 },
+    { name:"Vinyl Siding (Beaded)",             brand:"Royal",        unit:"SQ",  cost:85.00 },
+    { name:"LP SmartSide Panel (SQ)",           brand:"LP",           unit:"SQ",  cost:140.00},
+    { name:"Hardie Plank (SQ)",                 brand:"James Hardie", unit:"SQ",  cost:175.00},
+    { name:"J-Channel (12'6\")",                brand:"Generic",      unit:"PC",  cost:4.50  },
+    { name:"F-Channel (12'6\")",                brand:"Generic",      unit:"PC",  cost:4.50  },
+    { name:"Outside Corner Post (10')",         brand:"Generic",      unit:"PC",  cost:8.50  },
+    { name:"Inside Corner Post (10')",          brand:"Generic",      unit:"PC",  cost:7.50  },
+    { name:"Starter Strip (12'6\")",            brand:"Generic",      unit:"PC",  cost:5.00  },
+    { name:"Undersill Trim (12'6\")",           brand:"Generic",      unit:"PC",  cost:5.50  },
+    { name:"House Wrap (Tyvek, SQ)",            brand:"Tyvek",        unit:"SQ",  cost:12.00 }
+  ],
+  "fascia_soffit": [
+    { name:"Aluminum Fascia Coil 16\" (Brown)",  brand:"Generic",     unit:"RL",  cost:110.00 },
+    { name:"Aluminum Fascia Coil 16\" (White)",  brand:"Generic",     unit:"RL",  cost:108.00 },
+    { name:"Aluminum Fascia Coil 16\" (Musket)", brand:"Generic",     unit:"RL",  cost:110.00 },
+    { name:"Aluminum Fascia Coil 24\" (Brown)",  brand:"Generic",     unit:"RL",  cost:165.00 },
+    { name:"Vinyl Soffit Panel Vented (SQ)",     brand:"Generic",     unit:"SQ",  cost:55.00  },
+    { name:"Vinyl Soffit Panel Solid (SQ)",      brand:"Generic",     unit:"SQ",  cost:52.00  },
+    { name:"Soffit F-Channel (12'6\")",          brand:"Generic",     unit:"PC",  cost:5.00   },
+    { name:"Soffit J-Block",                     brand:"Generic",     unit:"EA",  cost:4.00   }
+  ],
+  "windows": [
+    { name:"Double-Hung Window (SM, up to 9SF)",   brand:"Alside",   unit:"EA",  cost:185.00 },
+    { name:"Double-Hung Window (MED, 10-15SF)",    brand:"Alside",   unit:"EA",  cost:245.00 },
+    { name:"Double-Hung Window (LG, 16-20SF)",     brand:"Alside",   unit:"EA",  cost:320.00 },
+    { name:"Single-Hung Window",                   brand:"Alside",   unit:"EA",  cost:165.00 },
+    { name:"Picture Window",                       brand:"Alside",   unit:"EA",  cost:295.00 },
+    { name:"Window Screen",                        brand:"Generic",  unit:"EA",  cost:28.00  },
+    { name:"Window Capping Kit",                   brand:"Generic",  unit:"EA",  cost:45.00  },
+    { name:"Window Flashing Tape (LF)",            brand:"Generic",  unit:"LF",  cost:1.20   }
+  ],
+  "misc": [
+    { name:"Geocel Pro Flex Caulk",             brand:"Geocel",      unit:"TUB", cost:9.00   },
+    { name:"NP-1 Polyurethane Caulk",           brand:"Tremco",      unit:"TUB", cost:12.00  },
+    { name:"Dumpster (10-yard)",                brand:"Waste Mgmt",  unit:"EA",  cost:395.00 },
+    { name:"Dumpster (15-yard)",                brand:"Waste Mgmt",  unit:"EA",  cost:445.00 },
+    { name:"Mag Roller (Nail Sweep)",           brand:"Generic",     unit:"EA",  cost:35.00  },
+    { name:"Roof Tarps (per SQ)",               brand:"Generic",     unit:"SQ",  cost:18.00  }
+  ]
+};
+
+
+// ============================================================
+// CALENDAR PAGE
+// ============================================================
+// ============================================================
+//  CALENDAR PAGE
+// ============================================================
+function renderCalendarPage() {
+  const now = new Date();
+  state._calYear  = state._calYear  || now.getFullYear();
+  state._calMonth = state._calMonth != null ? state._calMonth : now.getMonth();
+  state._calView  = state._calView  || 'month'; // month | week | list
+
+  document.getElementById('content').innerHTML = `
+    <div style="max-width:1100px;margin:0 auto">
+
+      <!-- HEADER -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-ghost btn-sm" onclick="calNav(-1)">&#x276E;</button>
+          <div style="font-size:18px;font-weight:800;min-width:180px;text-align:center" id="cal-title"></div>
+          <button class="btn btn-ghost btn-sm" onclick="calNav(1)">&#x276F;</button>
+          <button class="btn btn-ghost btn-sm" onclick="calGoToday()">Today</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:3px;background:var(--surface2);border-radius:8px;padding:3px">
+            <button onclick="setCalView('month')" id="calview-month" class="btn btn-ghost btn-sm" style="border-radius:6px">Month</button>
+            <button onclick="setCalView('week')"  id="calview-week"  class="btn btn-ghost btn-sm" style="border-radius:6px">Week</button>
+            <button onclick="setCalView('list')"  id="calview-list"  class="btn btn-ghost btn-sm" style="border-radius:6px">List</button>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="showNewTaskModal()">+ New Task</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncCalendarJN()" id="cal-sync-btn">&#x1F504; Sync JN</button>
+        </div>
+      </div>
+
+      <!-- LEGEND -->
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12px">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:5px"></span>Urgent / Overdue</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:5px"></span>Follow-Up</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb;margin-right:5px"></span>Inspection</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:5px"></span>Install / Crew</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7c3aed;margin-right:5px"></span>Adjuster</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6b7280;margin-right:5px"></span>General</span>
+      </div>
+
+      <!-- CALENDAR GRID -->
+      <div id="calendar-grid"></div>
+    </div>
+  `;
+
+  updateCalViewButtons();
+  renderCalGrid();
+  setTimeout(loadCalendarTasks, 100);
+}
+
+function updateCalViewButtons() {
+  ['month','week','list'].forEach(v => {
+    const btn = document.getElementById('calview-' + v);
+    if (!btn) return;
+    btn.style.background = state._calView === v ? 'var(--primary)' : 'transparent';
+    btn.style.color = state._calView === v ? '#fff' : 'var(--text2)';
+  });
+}
+
+function setCalView(v) {
+  state._calView = v;
+  updateCalViewButtons();
+  renderCalGrid();
+}
+
+function calNav(dir) {
+  if (state._calView === 'month') {
+    state._calMonth += dir;
+    if (state._calMonth > 11) { state._calMonth = 0; state._calYear++; }
+    if (state._calMonth < 0)  { state._calMonth = 11; state._calYear--; }
+  } else if (state._calView === 'week') {
+    state._calWeekOffset = (state._calWeekOffset || 0) + dir;
+  } else {
+    state._calMonth += dir;
+    if (state._calMonth > 11) { state._calMonth = 0; state._calYear++; }
+    if (state._calMonth < 0)  { state._calMonth = 11; state._calYear--; }
+  }
+  renderCalGrid();
+  setTimeout(loadCalendarTasks, 100);
+}
+
+function calGoToday() {
+  const now = new Date();
+  state._calYear = now.getFullYear();
+  state._calMonth = now.getMonth();
+  state._calWeekOffset = 0;
+  renderCalGrid();
+  setTimeout(loadCalendarTasks, 100);
+}
+
+function renderCalGrid() {
+  const grid = document.getElementById('calendar-grid');
+  if (!grid) return;
+
+  if (state._calView === 'month') renderMonthView(grid);
+  else if (state._calView === 'week') renderWeekView(grid);
+  else renderListView(grid);
+}
+
+function renderMonthView(grid) {
+  const y = state._calYear, m = state._calMonth;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = monthNames[m] + ' ' + y;
+
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = `
+    <div style="background:var(--surface2);border-radius:14px;overflow:hidden;border:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:2px solid var(--border)">
+        ${days.map(d => `<div style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:var(--text2)">${d}</div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);">
+  `;
+
+  // Empty cells before month start
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div style="min-height:100px;border:1px solid var(--border);padding:6px;background:var(--surface2);opacity:0.4"></div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const thisDay = new Date(y, m, d); thisDay.setHours(0,0,0,0);
+    const isToday = thisDay.getTime() === today.getTime();
+    const isWeekend = thisDay.getDay() === 0 || thisDay.getDay() === 6;
+    const dateKey = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    html += `
+      <div class="cal-day" id="calday-${dateKey}" onclick="openDayView('${dateKey}')" style="
+        min-height:100px;border:1px solid var(--border);padding:6px;cursor:pointer;
+        background:${isToday ? 'rgba(37,99,235,0.08)' : isWeekend ? 'rgba(0,0,0,0.02)' : 'var(--surface1)'};
+        transition:background 0.1s;
+      " onmouseover="this.style.background='rgba(37,99,235,0.05)'" onmouseout="this.style.background='${isToday ? 'rgba(37,99,235,0.08)' : 'transparent'}'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="
+            width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+            font-size:13px;font-weight:${isToday ? '800' : '500'};
+            background:${isToday ? 'var(--primary)' : 'transparent'};
+            color:${isToday ? '#fff' : 'var(--text1)'}
+          ">${d}</div>
+        </div>
+        <div id="calday-events-${dateKey}" style="display:grid;gap:2px"></div>
+      </div>
+    `;
+  }
+
+  // Trailing empty cells
+  const totalCells = firstDay + daysInMonth;
+  const trailing = 7 - (totalCells % 7);
+  if (trailing < 7) {
+    for (let i = 0; i < trailing; i++) {
+      html += `<div style="min-height:100px;border:1px solid var(--border);padding:6px;background:var(--surface2);opacity:0.4"></div>`;
+    }
+  }
+
+  html += `</div></div>`;
+  grid.innerHTML = html;
+}
+
+function renderWeekView(grid) {
+  const offset = state._calWeekOffset || 0;
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay() + (offset * 7));
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek); d.setDate(startOfWeek.getDate() + i);
+    days.push(d);
+  }
+
+  const weekStart = days[0].toLocaleDateString('en-US', {month:'short',day:'numeric'});
+  const weekEnd = days[6].toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('cal-title').textContent = weekStart + ' – ' + weekEnd;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = `
+    <div style="background:var(--surface1);border-radius:14px;overflow:hidden;border:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:2px solid var(--border)">
+        ${days.map(d => {
+          d.setHours(0,0,0,0);
+          const isToday = d.getTime() === today.getTime();
+          const dateKey = d.toISOString().slice(0,10);
+          return `
+            <div onclick="openDayView('${dateKey}')" style="padding:12px 6px;text-align:center;cursor:pointer;
+              background:${isToday ? 'rgba(37,99,235,0.1)' : 'transparent'}">
+              <div style="font-size:11px;color:var(--text2);font-weight:600">${dayNames[d.getDay()]}</div>
+              <div style="font-size:20px;font-weight:800;color:${isToday ? 'var(--primary)' : 'var(--text1)'}">${d.getDate()}</div>
+              <div id="calday-events-${dateKey}" style="display:grid;gap:2px;margin-top:4px"></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+  grid.innerHTML = html;
+}
+
+function renderListView(grid) {
+  const y = state._calYear, m = state._calMonth;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = monthNames[m] + ' ' + y;
+  grid.innerHTML = `<div id="cal-list-container">
+    <div class="spinner" style="width:24px;height:24px;margin:30px auto"></div>
+  </div>`;
+}
+
+async function loadCalendarTasks() {
+  if (!state._calTasks) state._calTasks = [];
+  try {
+    const r = await callFunction('entityFetch', { entity: 'ClaimTask', limit: 500 });
+    state._calTasks = r.records || [];
+  } catch(e) {
+    console.warn('Calendar task fetch error:', e.message);
+    state._calTasks = state.tasks || [];
+  }
+  populateCalendarEvents();
+}
+
+function getTaskColor(task) {
+  const type = (task.task_type || '').toLowerCase();
+  if (task.status === 'overdue') return '#ef4444';
+  if (task.priority === 'high')  return '#ef4444';
+  if (type.includes('install') || type.includes('crew')) return '#22c55e';
+  if (type.includes('inspect')) return '#2563eb';
+  if (type.includes('adjuster')) return '#7c3aed';
+  if (type.includes('follow') || type.includes('call')) return '#f59e0b';
+  return '#6b7280';
+}
+
+function populateCalendarEvents() {
+  const tasks = state._calTasks || [];
+
+  if (state._calView === 'list') {
+    renderListEvents(tasks);
+    return;
+  }
+
+  tasks.forEach(task => {
+    if (!task.due_date) return;
+    const dateKey = task.due_date.slice(0, 10);
+    const container = document.getElementById('calday-events-' + dateKey);
+    if (!container) return;
+
+    const color = getTaskColor(task);
+    const dot = document.createElement('div');
+    dot.style.cssText = `
+      display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:4px;
+      background:${color}22;font-size:10px;color:${color};font-weight:600;
+      cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+    `;
+    dot.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span>${(task.title||'Task').slice(0,18)}`;
+    dot.onclick = (e) => { e.stopPropagation(); openTaskDetail(task); };
+    container.appendChild(dot);
+  });
+}
+
+function renderListEvents(tasks) {
+  const container = document.getElementById('cal-list-container');
+  if (!container) return;
+
+  const y = state._calYear, m = state._calMonth;
+  const monthTasks = tasks.filter(t => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d.getFullYear() === y && d.getMonth() === m;
+  }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+  if (!monthTasks.length) {
+    container.innerHTML = '<div class="empty-state"><p>No tasks this month. Click <strong>+ New Task</strong> to add one or <strong>Sync JN</strong> to pull from JobNimbus.</p></div>';
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  monthTasks.forEach(t => {
+    const dk = t.due_date.slice(0, 10);
+    if (!byDate[dk]) byDate[dk] = [];
+    byDate[dk].push(t);
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  container.innerHTML = Object.entries(byDate).map(([dk, dayTasks]) => {
+    const d = new Date(dk + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    const isToday = dk === today;
+    return `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:${isToday ? 'var(--primary)' : 'var(--text1)'}">${label}</div>
+          ${isToday ? '<span style="background:var(--primary);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">TODAY</span>' : ''}
+        </div>
+        <div style="display:grid;gap:8px">
+          ${dayTasks.map(t => {
+            const color = getTaskColor(t);
+            return `
+              <div onclick="openTaskDetail(${JSON.stringify(t).replace(/"/g,'&quot;')})" style="
+                display:flex;align-items:center;gap:12px;padding:12px 16px;
+                background:var(--surface2);border-radius:10px;cursor:pointer;
+                border-left:3px solid ${color};
+              ">
+                <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:13px">${t.title||'Task'}</div>
+                  <div style="font-size:12px;color:var(--text2)">${t.task_type||''} ${t.assigned_to ? '· ' + t.assigned_to : ''} ${t.claim_id ? '· Job linked' : ''}</div>
+                </div>
+                <div>${getPriorityBadge(t.priority)}</div>
+                <div>${getStatusBadge(t.status)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function getPriorityBadge(p) {
+  const map = { high:['#ef4444','High'], medium:['#f59e0b','Med'], low:['#22c55e','Low'] };
+  const [c,l] = map[p] || ['#6b7280','—'];
+  return `<span style="background:${c}22;color:${c};font-size:10px;padding:2px 7px;border-radius:8px;font-weight:600">${l}</span>`;
+}
+
+function openDayView(dateKey) {
+  const tasks = (state._calTasks || []).filter(t => t.due_date?.slice(0,10) === dateKey);
+  const d = new Date(dateKey + 'T12:00:00');
+  const label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+
+  openModal('📅 ' + label, `
+    <div style="display:grid;gap:8px;margin-bottom:16px">
+      ${!tasks.length ? '<p style="color:var(--text2);font-size:13px">No tasks on this day.</p>' :
+        tasks.map(t => {
+          const color = getTaskColor(t);
+          return `
+            <div onclick="closeModal();openTaskDetail(${JSON.stringify(t).replace(/"/g,'&quot;')})" style="
+              padding:10px 14px;background:var(--surface2);border-radius:8px;cursor:pointer;
+              border-left:3px solid ${color}
+            ">
+              <div style="font-weight:600">${t.title}</div>
+              <div style="font-size:12px;color:var(--text2)">${t.task_type||''} · ${t.assigned_to||''} · ${getStatusBadge(t.status)}</div>
+            </div>
+          `;
+        }).join('')}
+    </div>
+    <button class="btn btn-primary" onclick="closeModal();showNewTaskModal('${dateKey}')">+ Add Task for This Day</button>
+  `);
+}
+
+function openTaskDetail(task) {
+  if (typeof task === 'string') { try { task = JSON.parse(task); } catch(e) { return; } }
+  openModal('✅ ' + (task.title||'Task'), `
+    <div class="detail-grid" style="margin-bottom:16px">
+      <div class="field-group"><div class="field-label">Title</div><div class="field-value">${task.title||'—'}</div></div>
+      <div class="field-group"><div class="field-label">Type</div><div class="field-value">${task.task_type||'—'}</div></div>
+      <div class="field-group"><div class="field-label">Due Date</div><div class="field-value">${task.due_date?.slice(0,10)||'—'}</div></div>
+      <div class="field-group"><div class="field-label">Assigned To</div><div class="field-value">${task.assigned_to||'—'}</div></div>
+      <div class="field-group"><div class="field-label">Priority</div><div class="field-value">${getPriorityBadge(task.priority)}</div></div>
+      <div class="field-group"><div class="field-label">Status</div><div class="field-value">${getStatusBadge(task.status)}</div></div>
+    </div>
+    ${task.description ? `<div style="font-size:13px;color:var(--text2);margin-bottom:16px">${task.description}</div>` : ''}
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="markTaskDone('${task.id}')">✓ Mark Done</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+async function markTaskDone(id) {
+  try {
+    await callFunction('entityUpdate', { entity: 'ClaimTask', id, data: { status: 'completed' } });
+    showToast('Task marked complete!', 'success');
+    closeModal();
+    loadCalendarTasks();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function showNewTaskModal(prefillDate) {
+  const today = prefillDate || new Date().toISOString().slice(0,10);
+  openModal('+ New Task', `
+    <div style="display:grid;gap:12px">
+      <div class="field-group"><div class="field-label">Title</div><input class="form-input" id="nt-title" placeholder="e.g. Adjuster meeting — John Smith"></div>
+      <div class="field-group"><div class="field-label">Task Type</div>
+        <select class="form-input" id="nt-type">
+          <option value="general">General</option>
+          <option value="inspection">Inspection</option>
+          <option value="adjuster_meeting">Adjuster Meeting</option>
+          <option value="install">Install / Crew Day</option>
+          <option value="follow_up">Follow-Up Call</option>
+          <option value="supplement">Supplement Submission</option>
+          <option value="call">Phone Call</option>
+        </select>
+      </div>
+      <div class="field-group"><div class="field-label">Due Date</div><input class="form-input" type="date" id="nt-date" value="${today}"></div>
+      <div class="field-group"><div class="field-label">Priority</div>
+        <select class="form-input" id="nt-priority">
+          <option value="medium">Medium</option><option value="high">High</option><option value="low">Low</option>
+        </select>
+      </div>
+      <div class="field-group"><div class="field-label">Assigned To</div><input class="form-input" id="nt-assigned" value="Austin Ihde"></div>
+      <div class="field-group"><div class="field-label">Notes</div><textarea class="form-input" id="nt-notes" rows="2" placeholder="Optional details..."></textarea></div>
+      <div id="nt-msg" style="font-size:13px"></div>
+    </div>
+  `, [
+    { label: 'Cancel', action: 'closeModal()' },
+    { label: '+ Create Task', primary: true, action: 'createCalTask()' }
+  ]);
+}
+
+async function createCalTask() {
+  const title    = document.getElementById('nt-title')?.value.trim();
+  const type     = document.getElementById('nt-type')?.value;
+  const dueDate  = document.getElementById('nt-date')?.value;
+  const priority = document.getElementById('nt-priority')?.value;
+  const assigned = document.getElementById('nt-assigned')?.value.trim();
+  const notes    = document.getElementById('nt-notes')?.value.trim();
+  const msgEl    = document.getElementById('nt-msg');
+
+  if (!title) { if(msgEl) msgEl.innerHTML='<span style="color:#ef4444">Title required.</span>'; return; }
+  try {
+    await callFunction('entityCreate', {
+      entity: 'ClaimTask',
+      data: {
+        title, task_type: type, due_date: dueDate ? dueDate + 'T09:00:00Z' : null,
+        priority, assigned_to: assigned, description: notes,
+        status: 'pending', created_by: state.user?.email || 'admin',
+        claim_id: ''
+      }
+    });
+    showToast('Task created!', 'success');
+    closeModal();
+    loadCalendarTasks();
+  } catch(e) {
+    if(msgEl) msgEl.innerHTML = '<span style="color:#ef4444">❌ ' + e.message + '</span>';
+  }
+}
+
+async function syncCalendarJN() {
+  const btn = document.getElementById('cal-sync-btn');
+  if (btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
+  try {
+    const r = await callFunction('syncJNCalendar', {});
+    showToast((r.message || 'JN calendar synced!'), 'success');
+    loadCalendarTasks();
+  } catch(e) {
+    showToast('Sync error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = '🔄 Sync JN'; btn.disabled = false; }
+  }
+}
+
+
+// ============================================================
+// MATERIAL ORDER REBUILD
+// ============================================================
+// ============================================================
+//  MATERIAL ORDER — Brand/Style/Color Dropdown System
+//  Replaces the old matorder panel in DocBuilder
+// ============================================================
+
+function buildMOPanel() {
+  const supplierOptions = Object.keys(SUPPLIER_CATALOG).map(s =>
+    `<option value="${s}">${s}</option>`
+  ).join('');
+
+  const templateOptions = Object.keys(MATERIAL_TEMPLATES).map(t =>
+    `<option value="${t}">${t}</option>`
+  ).join('');
+
+  return `
+  <div class="card"><div class="card-header">
+    <span class="card-title">&#x1F4E6; Material Order Builder</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="clearMO()">&#x1F5D1; Clear</button>
+      <button class="btn btn-primary btn-sm" onclick="printMO()">&#x1F5A8; Print/PDF</button>
+    </div>
+  </div>
+  <div class="card-body">
+
+    <!-- JOB HEADER -->
+    <div class="doc-header-form" style="margin-bottom:20px">
+      <div><label class="form-label">Client Name</label><input class="form-input" id="mo-client" placeholder="Homeowner Name"/></div>
+      <div><label class="form-label">Address</label><input class="form-input" id="mo-addr" placeholder="Job Address"/></div>
+      <div><label class="form-label">Order #</label><input class="form-input" id="mo-num" placeholder="1384"/></div>
+      <div><label class="form-label">Order Date</label><input class="form-input" type="date" id="mo-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      <div><label class="form-label">Delivery Date</label><input class="form-input" type="date" id="mo-delivery"/></div>
+      <div><label class="form-label">Job Number</label><input class="form-input" id="mo-job" placeholder="JN Job #"/></div>
+    </div>
+
+    <!-- SUPPLIER SELECTOR -->
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#x1F3ED; Supplier</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end">
+        <div>
+          <label class="form-label">Supplier / Distributor</label>
+          <select class="form-input" id="mo-supplier" onchange="onSupplierChange()">
+            <option value="">-- Select Supplier --</option>
+            ${supplierOptions}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Account # (optional)</label>
+          <input class="form-input" id="mo-acct" placeholder="Account number"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHINGLE SELECTOR (Brand → Style → Color) -->
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#x1F3E0; Shingle Selection</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end">
+        <div>
+          <label class="form-label">Brand</label>
+          <select class="form-input" id="mo-shingle-brand" onchange="onShingleBrandChange()">
+            <option value="">-- Select Brand --</option>
+            ${Object.keys(SHINGLE_CATALOG).map(b => `<option value="${b}">${b}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Style</label>
+          <select class="form-input" id="mo-shingle-style" onchange="onShingleStyleChange()" disabled>
+            <option value="">-- Select Style --</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Color</label>
+          <select class="form-input" id="mo-shingle-color" disabled>
+            <option value="">-- Select Color --</option>
+          </select>
+        </div>
+      </div>
+      <div id="mo-shingle-info" style="margin-top:10px;font-size:12px;color:var(--text2)"></div>
+      <div style="display:grid;grid-template-columns:100px 100px 1fr;gap:10px;align-items:end;margin-top:10px">
+        <div><label class="form-label">Squares</label><input class="form-input" id="mo-shingle-qty" type="number" step="0.5" placeholder="0.0"/></div>
+        <div style="padding-top:18px"><button class="btn btn-primary btn-sm" onclick="addShingleToOrder()" style="width:100%">+ Add</button></div>
+      </div>
+    </div>
+
+    <!-- TEMPLATE QUICK-ADD -->
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#x26A1; Template Quick-Add</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+        <div>
+          <label class="form-label">System Template</label>
+          <select class="form-input" id="mo-template">
+            <option value="">-- Select Template --</option>
+            ${templateOptions}
+          </select>
+        </div>
+        <button class="btn btn-orange" onclick="applyMOTemplate()">&#x26A1; Apply Template</button>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:8px" id="mo-template-desc"></div>
+    </div>
+
+    <!-- MANUAL ADD LINE -->
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#xFF0B; Add Item Manually</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;align-items:flex-end">
+        <div>
+          <label class="form-label">Category</label>
+          <select class="form-input" id="mo-trade" onchange="updateMOTrade()">
+            <option value="roofing_shingles">Roofing — Shingles</option>
+            <option value="roofing_underlayment">Roofing — Underlayment</option>
+            <option value="roofing_icewater">Roofing — Ice &amp; Water</option>
+            <option value="roofing_ridge">Roofing — Ridge Cap</option>
+            <option value="roofing_starter">Roofing — Starter Strip</option>
+            <option value="roofing_ventilation">Roofing — Ventilation</option>
+            <option value="roofing_flashing">Roofing — Flashing</option>
+            <option value="roofing_decking">Roofing — Decking / Hardware</option>
+            <option value="roofing_flatroof">Roofing — Flat Roof</option>
+            <option value="gutters">Gutters &amp; Downspouts</option>
+            <option value="siding">Siding &amp; Accessories</option>
+            <option value="fascia_soffit">Fascia &amp; Soffit</option>
+            <option value="windows">Windows</option>
+            <option value="misc">Misc / Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Item</label>
+          <select class="form-input" id="mo-product" onchange="updateMOProduct()"></select>
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <input class="form-input" id="mo-desc" placeholder="Auto-filled"/>
+        </div>
+        <div>
+          <label class="form-label">Unit Price</label>
+          <input class="form-input" id="mo-price" type="number" step="0.01" placeholder="0.00"/>
+        </div>
+        <div>
+          <label class="form-label">Qty</label>
+          <input class="form-input" id="mo-qty" type="number" step="0.01" placeholder="1"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="add-line-btn" onclick="addLineToMO()">&#xFF0B; Add to Order</button>
+        <button class="add-line-btn" onclick="addBlankMOLine()">&#xFF0B; Blank Line</button>
+      </div>
+    </div>
+
+    <!-- ORDER ITEMS TABLE -->
+    <hr style="border-color:var(--border);margin:4px 0 16px"/>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:700">Order Items</div>
+      <div style="font-size:12px;color:var(--text2)" id="mo-line-count">0 items</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="mo-table">
+        <thead><tr>
+          <th>Item / Brand</th><th>Description / Color</th><th>UOM</th>
+          <th>Qty</th><th>Unit Cost</th><th>Amount</th><th></th>
+        </tr></thead>
+        <tbody id="mo-lines"><tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">No items yet — select a shingle, apply a template, or add manually above.</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- TOTALS -->
+    <div class="totals-box">
+      <div class="totals-row"><span class="label">Subtotal</span><span class="val" id="mo-subtotal">$0.00</span></div>
+      <div class="totals-row"><span class="label">Sales Tax (9.679%)</span><span class="val" id="mo-tax">$0.00</span></div>
+      <div class="totals-row"><span>Total w/ Tax</span><span id="mo-grand">$0.00</span></div>
+    </div>
+
+    <!-- SPECIAL INSTRUCTIONS -->
+    <div style="margin-top:16px">
+      <label class="form-label">Special Instructions / Delivery Notes</label>
+      <textarea class="form-input" id="mo-notes" rows="3" placeholder="Delivery instructions, call Austin on arrival, special handling..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="printMO()">&#x1F5A8; Print / Export PDF</button>
+      <button class="btn btn-ghost" onclick="copyMOText()">&#x1F4CB; Copy as Text</button>
+    </div>
+
+  </div></div>
+  `;
+}
+
+// ── Shingle dropdown cascade ──────────────────────────────────
+function onShingleBrandChange() {
+  const brand = document.getElementById('mo-shingle-brand')?.value;
+  const styleEl = document.getElementById('mo-shingle-style');
+  const colorEl = document.getElementById('mo-shingle-color');
+  const infoEl  = document.getElementById('mo-shingle-info');
+
+  styleEl.innerHTML = '<option value="">-- Select Style --</option>';
+  colorEl.innerHTML = '<option value="">-- Select Color --</option>';
+  styleEl.disabled = !brand;
+  colorEl.disabled = true;
+  if (infoEl) infoEl.textContent = '';
+
+  if (!brand || !SHINGLE_CATALOG[brand]) return;
+  const styles = Object.keys(SHINGLE_CATALOG[brand].styles);
+  styles.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    styleEl.appendChild(opt);
+  });
+}
+
+function onShingleStyleChange() {
+  const brand = document.getElementById('mo-shingle-brand')?.value;
+  const style = document.getElementById('mo-shingle-style')?.value;
+  const colorEl = document.getElementById('mo-shingle-color');
+  const infoEl  = document.getElementById('mo-shingle-info');
+
+  colorEl.innerHTML = '<option value="">-- Select Color --</option>';
+  colorEl.disabled = true;
+  if (infoEl) infoEl.textContent = '';
+
+  if (!brand || !style) return;
+  const styleData = SHINGLE_CATALOG[brand]?.styles[style];
+  if (!styleData) return;
+
+  colorEl.disabled = false;
+  styleData.colors.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    colorEl.appendChild(opt);
+  });
+
+  if (infoEl) infoEl.innerHTML = `
+    <span style="background:var(--surface1);border-radius:6px;padding:4px 10px;display:inline-flex;gap:12px">
+      <span>Class: <strong>${styleData.class}</strong></span>
+      <span>Warranty: <strong>${styleData.warranty}</strong></span>
+      <span style="color:var(--text2)">${styleData.colors.length} colors available</span>
+    </span>
+  `;
+}
+
+function addShingleToOrder() {
+  const brand = document.getElementById('mo-shingle-brand')?.value;
+  const style = document.getElementById('mo-shingle-style')?.value;
+  const color = document.getElementById('mo-shingle-color')?.value;
+  const qty   = parseFloat(document.getElementById('mo-shingle-qty')?.value) || 0;
+
+  if (!brand || !style || !color) { showToast('Select brand, style, and color first.', 'error'); return; }
+  if (!qty || qty <= 0) { showToast('Enter quantity in squares.', 'error'); return; }
+
+  // Estimate unit cost based on class
+  const styleData = SHINGLE_CATALOG[brand].styles[style];
+  const costMap = { architectural: 110, luxury: 175, designer: 195, '3tab': 72 };
+  const unitCost = costMap[styleData?.class] || 110;
+
+  addMOLineItem({
+    item: `${brand} ${style}`,
+    desc: color,
+    uom: 'SQ',
+    qty,
+    cost: unitCost
+  });
+
+  showToast(`Added ${qty} SQ ${brand} ${style} (${color})`, 'success');
+  document.getElementById('mo-shingle-qty').value = '';
+}
+
+function onSupplierChange() {
+  const s = document.getElementById('mo-supplier')?.value;
+  if (s) showToast('Supplier set to ' + s, 'info');
+}
+
+function applyMOTemplate() {
+  const key = document.getElementById('mo-template')?.value;
+  if (!key || !MATERIAL_TEMPLATES[key]) { showToast('Select a template first.', 'error'); return; }
+
+  const t = MATERIAL_TEMPLATES[key];
+  document.getElementById('mo-template-desc').textContent = t.description;
+
+  let added = 0;
+  t.components.forEach(c => {
+    const catMap = {
+      shingles: null, // handled by shingle selector
+      icewater: MATERIAL_CATALOG.roofing_icewater,
+      underlayment: MATERIAL_CATALOG.roofing_underlayment,
+      ridge: MATERIAL_CATALOG.roofing_ridge,
+      starter: MATERIAL_CATALOG.roofing_starter,
+      ventilation: MATERIAL_CATALOG.roofing_ventilation,
+      drip_edge: MATERIAL_CATALOG.roofing_flashing,
+      flashing: MATERIAL_CATALOG.roofing_flashing,
+      nails: MATERIAL_CATALOG.roofing_decking,
+      flatroof: MATERIAL_CATALOG.roofing_flatroof,
+      primer: MATERIAL_CATALOG.roofing_flatroof,
+      gutters: MATERIAL_CATALOG.gutters,
+      siding: MATERIAL_CATALOG.siding,
+      fascia: MATERIAL_CATALOG.fascia_soffit,
+      soffit: MATERIAL_CATALOG.fascia_soffit,
+      misc: MATERIAL_CATALOG.misc,
+    };
+    if (c.category === 'shingles') return; // user sets shingles separately
+
+    const catItems = catMap[c.category] || [];
+    const match = catItems.find(i => i.name.toLowerCase().includes(c.item.toLowerCase().split(' ')[0]));
+    const cost = match ? match.cost : 0;
+
+    addMOLineItem({
+      item: c.item,
+      desc: c.category.replace(/_/g,' '),
+      uom: c.unit,
+      qty: 0, // user fills in quantities
+      cost
+    });
+    added++;
+  });
+
+  showToast(`Template applied — ${added} line items added. Fill in quantities.`, 'success');
+}
+
+// ── Shared MO line item functions ────────────────────────────
+if (!window._moLines) window._moLines = [];
+
+function addMOLineItem({ item, desc, uom, qty, cost }) {
+  if (!window._moLines) window._moLines = [];
+  window._moLines.push({ item, desc: desc || '', uom: uom || 'EA', qty: qty || 0, cost: cost || 0 });
+  renderMOLines();
+}
+
+function renderMOLines() {
+  const tbody = document.getElementById('mo-lines');
+  const countEl = document.getElementById('mo-line-count');
+  if (!tbody) return;
+
+  const lines = window._moLines || [];
+  if (!lines.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">No items yet.</td></tr>';
+    if (countEl) countEl.textContent = '0 items';
+    updateMOTotals();
+    return;
+  }
+
+  if (countEl) countEl.textContent = lines.length + ' item' + (lines.length !== 1 ? 's' : '');
+
+  tbody.innerHTML = lines.map((l, i) => `
+    <tr>
+      <td><input class="input-sm" value="${l.item}" onchange="updateMOLine(${i},'item',this.value)" style="min-width:120px"/></td>
+      <td><input class="input-sm" value="${l.desc}" onchange="updateMOLine(${i},'desc',this.value)" style="min-width:100px"/></td>
+      <td><select class="input-sm" onchange="updateMOLine(${i},'uom',this.value)" style="width:60px">
+        ${['SQ','LF','EA','PC','BX','BOX','SHT','RL','GAL','TUB','CTG','PAL','PR'].map(u =>
+          `<option ${l.uom===u?'selected':''}>${u}</option>`).join('')}
+      </select></td>
+      <td><input class="input-sm" type="number" step="0.5" value="${l.qty}" onchange="updateMOLine(${i},'qty',parseFloat(this.value)||0)" style="width:60px"/></td>
+      <td><input class="input-sm" type="number" step="0.01" value="${l.cost}" onchange="updateMOLine(${i},'cost',parseFloat(this.value)||0)" style="width:70px"/></td>
+      <td style="font-weight:600">$${((l.qty||0)*(l.cost||0)).toFixed(2)}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:#ef4444;padding:2px 6px" onclick="removeMOLine(${i})">✕</button></td>
+    </tr>
+  `).join('');
+
+  updateMOTotals();
+}
+
+function updateMOLine(i, field, val) {
+  if (!window._moLines || !window._moLines[i]) return;
+  window._moLines[i][field] = val;
+  updateMOTotals();
+}
+
+function removeMOLine(i) {
+  window._moLines.splice(i, 1);
+  renderMOLines();
+}
+
+function updateMOTotals() {
+  const lines = window._moLines || [];
+  const sub = lines.reduce((s, l) => s + ((l.qty||0) * (l.cost||0)), 0);
+  const tax = sub * 0.09679;
+  const grand = sub + tax;
+
+  const safe = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = '$' + val.toFixed(2); };
+  safe('mo-subtotal', sub);
+  safe('mo-tax', tax);
+  safe('mo-grand', grand);
+  if (document.getElementById('mo-total-cost')) document.getElementById('mo-total-cost').textContent = '$' + sub.toFixed(2);
+}
+
+function updateMOTrade() {
+  const trade = document.getElementById('mo-trade')?.value;
+  const productEl = document.getElementById('mo-product');
+  if (!productEl) return;
+
+  const catMap = {
+    roofing_shingles: [],
+    roofing_underlayment: MATERIAL_CATALOG.roofing_underlayment,
+    roofing_icewater: MATERIAL_CATALOG.roofing_icewater,
+    roofing_ridge: MATERIAL_CATALOG.roofing_ridge,
+    roofing_starter: MATERIAL_CATALOG.roofing_starter,
+    roofing_ventilation: MATERIAL_CATALOG.roofing_ventilation,
+    roofing_flashing: MATERIAL_CATALOG.roofing_flashing,
+    roofing_decking: MATERIAL_CATALOG.roofing_decking,
+    roofing_flatroof: MATERIAL_CATALOG.roofing_flatroof,
+    gutters: MATERIAL_CATALOG.gutters,
+    siding: MATERIAL_CATALOG.siding,
+    fascia_soffit: MATERIAL_CATALOG.fascia_soffit,
+    windows: MATERIAL_CATALOG.windows,
+    misc: MATERIAL_CATALOG.misc,
+  };
+
+  const items = catMap[trade] || [];
+  productEl.innerHTML = '<option value="">-- Select Item --</option>';
+  items.forEach(it => {
+    const opt = document.createElement('option');
+    opt.value = JSON.stringify(it);
+    opt.textContent = it.name + (it.brand && it.brand !== 'Generic' ? ' (' + it.brand + ')' : '');
+    productEl.appendChild(opt);
+  });
+}
+
+function updateMOProduct() {
+  const raw = document.getElementById('mo-product')?.value;
+  if (!raw) return;
+  try {
+    const it = JSON.parse(raw);
+    if (document.getElementById('mo-desc'))  document.getElementById('mo-desc').value  = it.brand || '';
+    if (document.getElementById('mo-price')) document.getElementById('mo-price').value = it.cost || '';
+  } catch(e) {}
+}
+
+function addLineToMO() {
+  const item  = document.getElementById('mo-product')?.options[document.getElementById('mo-product').selectedIndex]?.text?.split(' (')[0] || '';
+  const desc  = document.getElementById('mo-desc')?.value || '';
+  const price = parseFloat(document.getElementById('mo-price')?.value) || 0;
+  const qty   = parseFloat(document.getElementById('mo-qty')?.value) || 1;
+  const uomEl = document.getElementById('mo-trade');
+  const catMap = { gutters:'LF', siding:'SQ', roofing_shingles:'SQ', roofing_underlayment:'SQ', roofing_icewater:'SQ', fascia_soffit:'LF' };
+  const uom = catMap[uomEl?.value] || 'EA';
+  if (!item) { showToast('Select an item first.', 'error'); return; }
+  addMOLineItem({ item, desc, uom, qty, cost: price });
+}
+
+function addBlankMOLine() {
+  addMOLineItem({ item: '', desc: '', uom: 'EA', qty: 1, cost: 0 });
+}
+
+function copyMOText() {
+  const lines = window._moLines || [];
+  const client = document.getElementById('mo-client')?.value || '';
+  const addr   = document.getElementById('mo-addr')?.value || '';
+  const num    = document.getElementById('mo-num')?.value || '';
+  const dt     = document.getElementById('mo-date')?.value || '';
+  const supplier = document.getElementById('mo-supplier')?.value || 'TBD';
+  const notes  = document.getElementById('mo-notes')?.value || '';
+
+  const sub = lines.reduce((s,l)=>s+((l.qty||0)*(l.cost||0)),0);
+  const tax = sub*0.09679;
+  const grand = sub+tax;
+
+  const header = `MATERIAL ORDER #${num}\n${dt}\nClient: ${client}\nAddress: ${addr}\nSupplier: ${supplier}\n\n`;
+  const lineRows = lines.map(l =>
+    `${(l.item+' '+l.desc).trim().padEnd(40,' ')} ${String(l.qty).padStart(6)} ${l.uom.padEnd(4)}  $${((l.qty||0)*(l.cost||0)).toFixed(2)}`
+  ).join('\n');
+  const footer = `\n\nSubtotal: $${sub.toFixed(2)}\nSales Tax (9.679%): $${tax.toFixed(2)}\nTOTAL: $${grand.toFixed(2)}${notes ? '\n\nInstructions: ' + notes : ''}`;
+
+  navigator.clipboard.writeText(header + lineRows + footer).then(()=>showToast('Copied to clipboard!','success')).catch(()=>showToast('Copy failed','error'));
+}
+
+function clearMO() {
+  window._moLines = [];
+  renderMOLines();
+  ['mo-client','mo-addr','mo-num','mo-delivery','mo-job','mo-notes','mo-acct','mo-shingle-qty'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  ['mo-shingle-brand','mo-shingle-style','mo-shingle-color','mo-supplier','mo-template'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  if (document.getElementById('mo-shingle-style')) document.getElementById('mo-shingle-style').disabled = true;
+  if (document.getElementById('mo-shingle-color')) document.getElementById('mo-shingle-color').disabled = true;
+  if (document.getElementById('mo-date')) document.getElementById('mo-date').value = new Date().toISOString().slice(0,10);
+}
+
+
+// Init MO panel when switching to matorder tab
+const _origSwitchDocTab = typeof switchDocTab === 'function' ? switchDocTab : null;
+function switchDocTab(tab) {
+  document.querySelectorAll('.doc-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.db-tab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById('panel-' + tab);
+  const tabEl = document.querySelector(`.db-tab[onclick*="'${tab}'"]`);
+  if (panel) panel.classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+  if (tab === 'matorder') {
+    const inner = document.getElementById('mo-panel-inner');
+    if (inner && !inner._built) {
+      inner.innerHTML = buildMOPanel();
+      inner._built = true;
+      updateMOTrade();
+      window._moLines = window._moLines || [];
+      renderMOLines();
+    }
+  }
+}
+
+// entityCreate / entityUpdate via backend
+async function entityCreateBE(entity, data) {
+  return callFunction('entityCreateBE', { entity, data });
+}
+async function entityUpdateBE(entity, id, data) {
+  return callFunction('entityUpdateBE', { entity, id, data });
+}
+
 </script>
 
 </body>
