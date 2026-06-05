@@ -4519,69 +4519,8 @@ function renderDocBuilderPage() {
   </div>
 
   <!-- WORK ORDER -->
-  <div class="doc-panel" id="panel-workorder">
-    <div class="card"><div class="card-header"><span class="card-title">&#x1F528; Work Order Builder</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="clearWO()">&#x1F5D1; Clear</button>
-        <button class="btn btn-primary btn-sm" onclick="printWO()">&#x1F5A8; Print/PDF</button>
-      </div></div>
-      <div class="card-body">
-        <div class="doc-header-form">
-          <div><label class="form-label">Client Name</label><input class="form-input" id="wo-client" placeholder="Homeowner Name"/></div>
-          <div><label class="form-label">Address</label><input class="form-input" id="wo-addr" placeholder="Job Address"/></div>
-          <div><label class="form-label">Work Order #</label><input class="form-input" id="wo-num" placeholder="1445"/></div>
-          <div><label class="form-label">Date</label><input class="form-input" type="date" id="wo-date" value="${new Date().toISOString().slice(0,10)}"/></div>
-          <div><label class="form-label">Job Number</label><input class="form-input" id="wo-job" placeholder="JN Job #"/></div>
-          <div><label class="form-label">Roof Type</label>
-            <select class="form-input" id="wo-rooftype">
-              <option>Architectural Shingle</option><option>3-Tab Shingle</option>
-              <option>Impact Resistant Shingle</option><option>Modified Bitumen</option>
-              <option>TPO</option><option>EPDM</option><option>Standing Seam Metal</option>
-              <option>Exposed Fastener Metal</option><option>Concrete Tile</option>
-              <option>Clay Tile</option><option>Slate</option><option>Cedar Shake</option>
-            </select></div>
-          <div><label class="form-label">Squares</label><input class="form-input" id="wo-sq" type="number" step="0.01" placeholder="0.00"/></div>
-          <div><label class="form-label">Pitch</label>
-            <select class="form-input" id="wo-pitch">
-              <option>4/12</option><option>5/12</option><option>6/12</option><option>7/12</option>
-              <option>8/12</option><option>9/12</option><option>10/12</option><option>12/12</option><option>Flat</option>
-            </select></div>
-          <div><label class="form-label">Stories</label>
-            <select class="form-input" id="wo-stories">
-              <option>1 Story</option><option>2 Story</option><option>3 Story</option>
-            </select></div>
-        </div>
-        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 10px">Scope -- Check All That Apply</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
-          ${['Full Tear-Off','Install Decking','Re-nail Decking','Ice & Water Shield','Synthetic Underlayment','Drip Edge','Gutter Apron','Starter Strip','Install Shingles','Ridge Cap','Ridge Vent','Pipe Boots','Step Flashing','Counter Flashing','Gutters','Downspouts','Soffit','Fascia','Siding','Windows','Garage Door','Dump/Haul','Permit Pull'].map(s=>`
-            <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;padding:6px 8px;background:var(--navy3);border-radius:6px;border:1px solid var(--border)">
-              <input type="checkbox" class="wo-scope-cb" data-scope="${s}" style="cursor:pointer"> ${s}
-            </label>`).join('')}
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:700">Labor Line Items (Crew Pay)</div>
-          <button class="btn btn-ghost btn-sm" onclick="addWOLine()">&#xFF0B; Add Line</button>
-        </div>
-        <div id="wo-lines"></div>
-        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 10px">Special Instructions</div>
-        <div id="wo-instructions">
-          ${['Protect shrubs and landscaping','7 am is the earliest you can start work','Any damaged gutters will be deducted from pay','DO NOT BLOCK MAIN ENTRANCE','Make sure jobsite is cleaned up before you take a break or leave for the day'].map((inst,i)=>`
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <span style="min-width:20px;font-size:12px;font-weight:700;color:var(--blue)">${i+1}.</span>
-              <input class="form-input" value="${inst}" style="flex:1"/>
-              <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px">&#xD7;</button>
-            </div>`).join('')}
-        </div>
-        <button class="add-line-btn" onclick="addWOInstruction()">&#xFF0B; Add Instruction</button>
-        <div class="totals-box" style="margin-top:20px">
-          <div class="totals-row"><span class="label">Total Crew Pay</span><span class="val" id="wo-total">$0.00</span></div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="printWO()">&#x1F5A8; Print / Export PDF</button>
-          <button class="btn btn-ghost" onclick="copyWOText()">&#x1F4CB; Copy as Text</button>
-        </div>
-      </div></div>
-  </div>
+    <div class="doc-panel" id="panel-workorder"><div id="wo-panel-inner"></div></div>
+
 
   <!-- PRODUCT CATALOG -->
   <div class="doc-panel" id="panel-catalog">
@@ -7332,6 +7271,455 @@ async function entityCreateBE(entity, data) {
 }
 async function entityUpdateBE(entity, id, data) {
   return callFunction('entityUpdateBE', { entity, id, data });
+}
+
+
+
+// ============================================================
+// WO LABOR CATALOG — Real Cox Roofing JN averages (3,500+ jobs)
+// ============================================================
+// ============================================================
+//  WORK ORDER — LABOR CATALOG (pulled from live JN data)
+//  Real averages from 3,500+ Cox Roofing jobs
+// ============================================================
+
+const WO_LABOR = {
+
+  // ── SHINGLE INSTALL ──────────────────────────────────────
+  shingle_install: [
+    { name: "Laminated Arch. Shingle Install (w/ felt)",   uom: "SQ", labor: 137.07, mat: 165.03, jn_uses: 147 },
+    { name: "Laminated Arch. Shingle Install (no felt)",   uom: "SQ", labor: 114.20, mat: 151.75, jn_uses: 24  },
+    { name: "Laminated High Grade Shingle Install",        uom: "SQ", labor: 145.16, mat: 183.97, jn_uses: 3   },
+    { name: "3-Tab 25yr Shingle Install (w/ felt)",        uom: "SQ", labor: 174.15, mat: 190.13, jn_uses: 1   },
+    { name: "3-Tab 25yr Shingle Install (no felt)",        uom: "SQ", labor: 108.36, mat: 132.42, jn_uses: 4   },
+  ],
+
+  // ── TEAR-OFF ─────────────────────────────────────────────
+  tearoff: [
+    { name: "Tear Off, Haul & Dispose — Laminated",        uom: "SQ", labor: 75.95,  mat: 20.65, jn_uses: 161 },
+    { name: "Tear Off, Haul & Dispose — 3-Tab",            uom: "SQ", labor: 77.97,  mat: 13.40, jn_uses: 12  },
+    { name: "Tear Off, Haul & Dispose — Wood Shake",       uom: "SQ", labor: 175.00, mat: 0,     jn_uses: 1   },
+    { name: "Tear Off — Laminated (No Haul Off)",          uom: "SQ", labor: 57.29,  mat: 0,     jn_uses: 5   },
+    { name: "Additional Layer Removal",                    uom: "SQ", labor: 48.74,  mat: 15.85, jn_uses: 48  },
+    { name: "Additional Layer Removal (No Haul Off)",      uom: "SQ", labor: 36.04,  mat: 0,     jn_uses: 1   },
+  ],
+
+  // ── STEEP / STORY CHARGES ────────────────────────────────
+  steep_story: [
+    { name: "2-Story Charge",                              uom: "SQ", labor: 26.89,  mat: 0,     jn_uses: 111 },
+    { name: "Steep Charge — 7/12 to 9/12",                uom: "SQ", labor: 62.24,  mat: 0,     jn_uses: 25  },
+    { name: "Steep Charge — 10/12 to 12/12",              uom: "SQ", labor: 102.38, mat: 0,     jn_uses: 73  },
+    { name: "Steep Charge — Over 12/12",                  uom: "SQ", labor: 121.42, mat: 0,     jn_uses: 10  },
+    { name: "Steep Charge — Mansard (13/12+)",            uom: "SQ", labor: 205.44, mat: 0,     jn_uses: 1   },
+    { name: "3-Story Access Charge",                      uom: "SQ", labor: 0,      mat: 15.75, jn_uses: 3   },
+    { name: "Steep Tear-Off Add Charge — 7/12 to 9/12",  uom: "SQ FT", labor: 0.22, mat: 0.07, jn_uses: 63  },
+    { name: "Steep Tear-Off Add Charge — 10/12 to 12/12",uom: "SQ FT", labor: 0.35, mat: 0.07, jn_uses: 40  },
+    { name: "Steep Tear-Off Add Charge — Over 12/12",    uom: "SQ FT", labor: 0.43, mat: 0.07, jn_uses: 17  },
+  ],
+
+  // ── DECKING / PLYWOOD ────────────────────────────────────
+  decking: [
+    { name: "Plywood Sheathing — 1/2\" CDX (per sq ft)",  uom: "SQ FT", labor: 2.19, mat: 0.94, jn_uses: 24 },
+    { name: "Plywood Sheathing — 5/8\" CDX (per sq ft)",  uom: "SQ FT", labor: 2.81, mat: 1.31, jn_uses: 3  },
+    { name: "OSB Sheathing — 5/8\" (per sq ft)",          uom: "SQ FT", labor: 2.13, mat: 0.87, jn_uses: 11 },
+    { name: "OSB Sheathing — 1/2\" (per sq ft)",          uom: "SQ FT", labor: 5.36, mat: 3.51, jn_uses: 7  },
+    { name: "Crew Decking — per 4x8 sheet",               uom: "EA",    labor: 80.16, mat: 0,   jn_uses: 8  },
+    { name: "OSB Sheet (supply only)",                    uom: "EA",    labor: 0,    mat: 81.19, jn_uses: 6  },
+  ],
+
+  // ── CHIMNEY FLASHING ─────────────────────────────────────
+  chimney: [
+    { name: "Chimney Flashing — Small (24x24)",           uom: "EA", labor: 260.94, mat: 64.85,  jn_uses: 46 },
+    { name: "Chimney Flashing — Average (32x36)",         uom: "EA", labor: 329.68, mat: 118.36, jn_uses: 70 },
+    { name: "Chimney Flashing — Large (32x60)",           uom: "EA", labor: 414.37, mat: 176.10, jn_uses: 64 },
+    { name: "Chimney Flashing — Large Copper (32x60)",    uom: "EA", labor: 439.61, mat: 753.04, jn_uses: 2  },
+    { name: "Crew Install Cricket",                       uom: "EA", labor: 220.21, mat: 130.32, jn_uses: 4  },
+  ],
+
+  // ── STEP / MISC FLASHING ─────────────────────────────────
+  flashing: [
+    { name: "Step Flashing",                              uom: "LF", labor: 7.51,  mat: 2.31, jn_uses: 104 },
+    { name: "Counterflashing — Apron Flashing",          uom: "LF", labor: 8.53,  mat: 2.14, jn_uses: 54  },
+    { name: "Pipe Jack",                                  uom: "EA", labor: 40.40, mat: 16.93, jn_uses: 148 },
+    { name: "Pipe Jack — Lead Boot",                     uom: "EA", labor: 40.25, mat: 54.46, jn_uses: 28  },
+    { name: "Pipe Jack — PVC/TPO",                       uom: "EA", labor: 43.81, mat: 40.44, jn_uses: 13  },
+    { name: "Pipe Jack — Split Boot",                    uom: "EA", labor: 47.23, mat: 124.19, jn_uses: 4  },
+    { name: "Curb Flashing — PVC/TPO",                  uom: "LF", labor: 15.23, mat: 11.78, jn_uses: 6   },
+  ],
+
+  // ── RIDGE / VENTILATION ──────────────────────────────────
+  ridge_vent: [
+    { name: "Continuous Ridge Vent — Shingle-Over",      uom: "LF", labor: 6.07,  mat: 4.51, jn_uses: 102 },
+    { name: "Ridge Vent — Standard (Cobra/Filtered)",    uom: "LF", labor: 5.80,  mat: 3.95, jn_uses: 18  },
+    { name: "Off-Ridge Exhaust Vent",                    uom: "EA", labor: 49.50, mat: 42.00, jn_uses: 12  },
+    { name: "Roof Vent — Plastic (Slant Back)",          uom: "EA", labor: 44.00, mat: 42.00, jn_uses: 8   },
+    { name: "Power Attic Ventilator",                    uom: "EA", labor: 89.57, mat: 148.50, jn_uses: 5  },
+    { name: "Hip Cap — Laminated",                       uom: "LF", labor: 3.26,  mat: 2.58, jn_uses: 89  },
+  ],
+
+  // ── UNDERLAYMENT / IWS ───────────────────────────────────
+  underlayment: [
+    { name: "Synthetic Underlayment",                    uom: "SQ", labor: 15.79, mat: 18.23, jn_uses: 97  },
+    { name: "Felt Underlayment — 30#",                   uom: "SQ", labor: 12.40, mat: 9.60,  jn_uses: 45  },
+    { name: "Ice & Water Shield — Eaves",                uom: "SQ", labor: 18.50, mat: 55.00, jn_uses: 112 },
+    { name: "Ice & Water Shield — Full Coverage (IWS)", uom: "SQ", labor: 18.50, mat: 55.00, jn_uses: 30  },
+  ],
+
+  // ── STARTER / DRIP EDGE ──────────────────────────────────
+  starter_drip: [
+    { name: "Starter Strip — Universal Course",          uom: "LF", labor: 0.88,  mat: 0.88, jn_uses: 169 },
+    { name: "Starter Strip — Laminated Double Layer",    uom: "LF", labor: 1.97,  mat: 3.11, jn_uses: 2   },
+    { name: "Drip Edge",                                 uom: "LF", labor: 1.93,  mat: 1.17, jn_uses: 149 },
+    { name: "Drip Edge / Gutter Apron",                  uom: "LF", labor: 1.93,  mat: 1.44, jn_uses: 48  },
+    { name: "Drip Edge — PVC/TPO Clad",                 uom: "LF", labor: 1.81,  mat: 5.95, jn_uses: 12  },
+  ],
+
+  // ── GUTTERS ──────────────────────────────────────────────
+  gutters: [
+    { name: "5\" Aluminum Gutter & Downspout",           uom: "LF", labor: 4.88,  mat: 4.87, jn_uses: 4   },
+    { name: "5\" Aluminum Gutter (supply + install)",    uom: "LF", labor: 7.50,  mat: 7.50, jn_uses: 3   },
+    { name: "6\" Aluminum Gutter",                       uom: "LF", labor: 17.00, mat: 6.82, jn_uses: 2   },
+    { name: "5\" Aluminum Gutter Guards",                uom: "LF", labor: 4.00,  mat: 4.00, jn_uses: 2   },
+    { name: "Downspout 3x4",                             uom: "LF", labor: 0,     mat: 12.50, jn_uses: 1  },
+    { name: "Aluminum Termination Bar / Flashing",       uom: "LF", labor: 3.01,  mat: 3.34, jn_uses: 29  },
+  ],
+
+  // ── SATELLITE ────────────────────────────────────────────
+  satellite: [
+    { name: "Satellite Dish — Detach & Reset",           uom: "EA", labor: 55.60, mat: 0, jn_uses: 62 },
+  ],
+
+  // ── DUMP / HAUL ──────────────────────────────────────────
+  dump: [
+    { name: "Dump Fee",                                   uom: "EA", labor: 0,    mat: 550.00, jn_uses: 13 },
+    { name: "Dumpster",                                   uom: "EA", labor: 0,    mat: 450.00, jn_uses: 5  },
+    { name: "Crew Dump Fee",                              uom: "EA", labor: 0,    mat: 650.00, jn_uses: 2  },
+    { name: "Dispose Of Trash and Debris",               uom: "EA", labor: 250,  mat: 0,      jn_uses: 1  },
+  ],
+
+  // ── FLAT ROOF ────────────────────────────────────────────
+  flat_roof: [
+    { name: "Apply Mod Bit Torch Down",                  uom: "SQ", labor: 415.00, mat: 285.00, jn_uses: 3 },
+    { name: "Crew Mod Bit Torch Down Overlay",           uom: "SQ", labor: 180.20, mat: 0,      jn_uses: 1 },
+    { name: "Bitumen — Add Base Sheet (Self-Adhering)",  uom: "SQ", labor: 69.18,  mat: 81.46,  jn_uses: 11},
+    { name: "Bitumen — Add Glass Felt (Hot Mopped)",     uom: "SQ", labor: 100.35, mat: 25.56,  jn_uses: 3 },
+    { name: "Tear Off Mod Bit Roofing",                  uom: "SQ", labor: 77.81,  mat: 9.29,   jn_uses: 16},
+    { name: "Remove Flat Roofing Material",              uom: "SQ", labor: 111.59, mat: 0,      jn_uses: 5 },
+    { name: "Aluminum Termination Bar",                  uom: "LF", labor: 3.01,   mat: 3.34,   jn_uses: 29},
+    { name: "TPO/PVC Curb Flashing",                     uom: "LF", labor: 15.23,  mat: 11.78,  jn_uses: 6 },
+  ],
+};
+
+// ── Category display labels ───────────────────────────────
+const WO_CATEGORY_LABELS = {
+  shingle_install: "🏠 Shingle Install",
+  tearoff:         "🔨 Tear-Off / Remove",
+  steep_story:     "📐 Steep / Story Charges",
+  decking:         "🪵 Decking / Plywood",
+  chimney:         "🧱 Chimney Flashing",
+  flashing:        "🔩 Step & Misc Flashing",
+  ridge_vent:      "💨 Ridge & Ventilation",
+  underlayment:    "🧻 Underlayment / IWS",
+  starter_drip:    "📏 Starter & Drip Edge",
+  gutters:         "🌧️ Gutters",
+  satellite:       "📡 Satellite",
+  dump:            "🗑️ Dump / Haul Off",
+  flat_roof:       "🏢 Flat Roof",
+};
+
+
+// ── Work Order Panel Builder ─────────────────────────────────
+if (!window._woLines) window._woLines = [];
+
+function buildWOPanel() {
+  const catOptions = Object.keys(WO_CATEGORY_LABELS).map(k =>
+    `<option value="${k}">${WO_CATEGORY_LABELS[k]}</option>`
+  ).join('');
+
+  return `
+  <div class="card"><div class="card-header">
+    <span class="card-title">&#x1F527; Work Order Builder</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="clearWO()">&#x1F5D1; Clear</button>
+      <button class="btn btn-primary btn-sm" onclick="printWO()">&#x1F5A8; Print/PDF</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="doc-header-form" style="margin-bottom:20px">
+      <div><label class="form-label">Client Name</label><input class="form-input" id="wo-client" placeholder="Homeowner Name"/></div>
+      <div><label class="form-label">Address</label><input class="form-input" id="wo-addr" placeholder="Job Address"/></div>
+      <div><label class="form-label">WO #</label><input class="form-input" id="wo-num" placeholder="1384"/></div>
+      <div><label class="form-label">Date</label><input class="form-input" type="date" id="wo-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      <div><label class="form-label">Crew / Sub</label><input class="form-input" id="wo-crew" placeholder="Crew name or sub"/></div>
+      <div><label class="form-label">Job Number</label><input class="form-input" id="wo-job" placeholder="JN #"/></div>
+    </div>
+
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">&#x26A1; Quick Scope Auto-Builder</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div><label class="form-label">Total Squares</label><input class="form-input" id="wo-squares" type="number" step="0.5" placeholder="0.0"/></div>
+        <div><label class="form-label">Stories</label>
+          <select class="form-input" id="wo-stories">
+            <option value="1">1 Story</option><option value="2">2 Story</option><option value="3">3 Story</option>
+          </select></div>
+        <div><label class="form-label">Pitch</label>
+          <select class="form-input" id="wo-pitch">
+            <option value="low">4/12&#x2013;6/12 (Low)</option>
+            <option value="mid">7/12&#x2013;9/12 (Mid)</option>
+            <option value="steep">10/12&#x2013;12/12 (Steep)</option>
+            <option value="vsteep">Over 12/12 (V. Steep)</option>
+            <option value="mansard">Mansard 13/12+</option>
+          </select></div>
+        <div><label class="form-label">Layers</label>
+          <select class="form-input" id="wo-layers">
+            <option value="1">1 Layer</option><option value="2">2 Layers</option>
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">
+        <div><label class="form-label">Chimney (Avg 32x36)</label><input class="form-input" id="wo-chimney-avg" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Chimney (Lg 32x60)</label><input class="form-input" id="wo-chimney-lg" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Chimney (Sm 24x24)</label><input class="form-input" id="wo-chimney-sm" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Pipe Jacks</label><input class="form-input" id="wo-pipejacks" type="number" step="1" placeholder="0"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">
+        <div><label class="form-label">Ridge Vent (LF)</label><input class="form-input" id="wo-ridgevent" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Satellite D&amp;R</label><input class="form-input" id="wo-satellite" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Plywood Sheets</label><input class="form-input" id="wo-plywood" type="number" step="1" placeholder="0"/></div>
+        <div><label class="form-label">Step Flash (LF)</label><input class="form-input" id="wo-stepflash" type="number" step="1" placeholder="0"/></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-orange" onclick="applyWOScope()" style="width:100%">&#x26A1; Auto-Build Work Order</button>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">+ Add Line Item Manually</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 80px 80px auto;gap:8px;align-items:flex-end">
+        <div><label class="form-label">Category</label>
+          <select class="form-input" id="wo-cat" onchange="loadWOItems()">${catOptions}</select></div>
+        <div><label class="form-label">Line Item</label>
+          <select class="form-input" id="wo-item" onchange="fillWOItem()"><option value="">-- Select --</option></select></div>
+        <div><label class="form-label">Qty</label><input class="form-input" id="wo-qty" type="number" step="0.5" placeholder="0"/></div>
+        <div><label class="form-label">Labor $</label><input class="form-input" id="wo-labor-price" type="number" step="0.01" placeholder="0.00"/></div>
+        <div style="padding-top:18px"><button class="btn btn-primary btn-sm" onclick="addWOLine()">+ Add</button></div>
+      </div>
+    </div>
+
+    <hr style="border-color:var(--border);margin:4px 0 16px"/>
+    <div style="overflow-x:auto">
+      <table class="mo-table">
+        <thead><tr><th>Line Item</th><th>UOM</th><th>Qty</th><th>Unit Labor</th><th>Total Labor</th><th>Unit Mat</th><th>Total Mat</th><th></th></tr></thead>
+        <tbody id="wo-lines"><tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px">No items yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="totals-box" style="margin-top:16px">
+      <div class="totals-row"><span class="label">Total Labor</span><span class="val" id="wo-total-labor">$0.00</span></div>
+      <div class="totals-row"><span class="label">Total Materials</span><span class="val" id="wo-total-mat">$0.00</span></div>
+      <div class="totals-row"><span>Grand Total</span><span id="wo-grand">$0.00</span></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <label class="form-label">Special Instructions</label>
+      <textarea class="form-input" id="wo-notes" rows="4" placeholder="No nail guns on ridge vent. Park on street only. Keep gates closed — dogs on property..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="printWO()">&#x1F5A8; Print / Export PDF</button>
+      <button class="btn btn-ghost" onclick="copyWOText()">&#x1F4CB; Copy as Text</button>
+    </div>
+  </div></div>`;
+}
+
+function loadWOItems() {
+  const cat = document.getElementById('wo-cat')?.value;
+  const el  = document.getElementById('wo-item');
+  if (!el) return;
+  el.innerHTML = '<option value="">-- Select --</option>';
+  if (!cat || !WO_LABOR[cat]) return;
+  WO_LABOR[cat].forEach((it,i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = it.name + ' (' + it.uom + ')';
+    el.appendChild(opt);
+  });
+}
+
+function fillWOItem() {
+  const cat = document.getElementById('wo-cat')?.value;
+  const idx = parseInt(document.getElementById('wo-item')?.value);
+  if (!cat || isNaN(idx) || !WO_LABOR[cat]?.[idx]) return;
+  const it = WO_LABOR[cat][idx];
+  if (document.getElementById('wo-labor-price')) document.getElementById('wo-labor-price').value = it.labor;
+}
+
+function addWOLine() {
+  const cat   = document.getElementById('wo-cat')?.value;
+  const idx   = parseInt(document.getElementById('wo-item')?.value);
+  const qty   = parseFloat(document.getElementById('wo-qty')?.value) || 0;
+  const labor = parseFloat(document.getElementById('wo-labor-price')?.value) || 0;
+  if (!cat || isNaN(idx) || !WO_LABOR[cat]?.[idx]) { showToast('Select category and item.','error'); return; }
+  if (!qty) { showToast('Enter quantity.','error'); return; }
+  const it = WO_LABOR[cat][idx];
+  window._woLines = window._woLines || [];
+  window._woLines.push({ name: it.name, uom: it.uom, qty, labor, mat: it.mat });
+  renderWOLines();
+  document.getElementById('wo-qty').value = '';
+}
+
+function applyWOScope() {
+  const sq       = parseFloat(document.getElementById('wo-squares')?.value) || 0;
+  const stories  = parseInt(document.getElementById('wo-stories')?.value) || 1;
+  const pitch    = document.getElementById('wo-pitch')?.value || 'low';
+  const layers   = parseInt(document.getElementById('wo-layers')?.value) || 1;
+  const chAvg    = parseInt(document.getElementById('wo-chimney-avg')?.value) || 0;
+  const chLg     = parseInt(document.getElementById('wo-chimney-lg')?.value) || 0;
+  const chSm     = parseInt(document.getElementById('wo-chimney-sm')?.value) || 0;
+  const pipes    = parseInt(document.getElementById('wo-pipejacks')?.value) || 0;
+  const ridgeLF  = parseInt(document.getElementById('wo-ridgevent')?.value) || 0;
+  const satCount = parseInt(document.getElementById('wo-satellite')?.value) || 0;
+  const plySheets= parseInt(document.getElementById('wo-plywood')?.value) || 0;
+  const stepFlLF = parseInt(document.getElementById('wo-stepflash')?.value) || 0;
+
+  if (!sq) { showToast('Enter total squares first.','error'); return; }
+  window._woLines = [];
+
+  const add = (name,uom,qty,labor,mat) => { if(qty>0) window._woLines.push({name,uom,qty,labor,mat}); };
+
+  // Tear-off
+  add('Tear Off, Haul & Dispose — Laminated','SQ',sq,75.95,20.65);
+  if (layers===2) add('Additional Layer Removal','SQ',sq,48.74,15.85);
+
+  // Install
+  add('Laminated Arch. Shingle Install (w/ felt)','SQ',sq,137.07,165.03);
+
+  // Story charges
+  if (stories>=2) add('2-Story Charge','SQ',sq,26.89,0);
+  if (stories>=3) add('3-Story Access Charge','SQ',sq,0,15.75);
+
+  // Steep
+  const steepMap = {
+    mid:    ['Steep Charge — 7/12 to 9/12',62.24],
+    steep:  ['Steep Charge — 10/12 to 12/12',102.38],
+    vsteep: ['Steep Charge — Over 12/12',121.42],
+    mansard:['Steep Charge — Mansard (13/12+)',205.44],
+  };
+  if (steepMap[pitch]) add(steepMap[pitch][0],'SQ',sq,steepMap[pitch][1],0);
+
+  // Standard accessories
+  const perimLF = Math.ceil(sq*10*0.15);
+  add('Synthetic Underlayment','SQ',sq,15.79,18.23);
+  add('Ice & Water Shield — Eaves','SQ',Math.max(1,Math.ceil(sq*0.12)),18.50,55.00);
+  add('Starter Strip — Universal Course','LF',perimLF,0.88,0.88);
+  add('Drip Edge','LF',perimLF,1.93,1.17);
+  add('Hip Cap — Laminated','LF',Math.ceil(sq*10*0.08),3.26,2.58);
+
+  // Ridge vent
+  if (ridgeLF>0) add('Continuous Ridge Vent — Shingle-Over','LF',ridgeLF,6.07,4.51);
+  else add('Continuous Ridge Vent — Shingle-Over','LF',Math.ceil(sq*10*0.05),6.07,4.51);
+
+  // Chimneys
+  if (chSm>0)  add('Chimney Flashing — Small (24x24)','EA',chSm,260.94,64.85);
+  if (chAvg>0) add('Chimney Flashing — Average (32x36)','EA',chAvg,329.68,118.36);
+  if (chLg>0)  add('Chimney Flashing — Large (32x60)','EA',chLg,414.37,176.10);
+
+  // Pipe jacks
+  if (pipes>0) add('Pipe Jack','EA',pipes,40.40,16.93);
+
+  // Step flashing
+  if (stepFlLF>0) add('Step Flashing','LF',stepFlLF,7.51,2.31);
+
+  // Plywood
+  if (plySheets>0) add('Crew Decking — per 4x8 sheet','EA',plySheets,80.16,0);
+
+  // Satellite
+  if (satCount>0) add('Satellite Dish — Detach & Reset','EA',satCount,55.60,0);
+
+  // Dump
+  add('Dump Fee','EA',1,0,550.00);
+
+  renderWOLines();
+  showToast('Work order built — ' + window._woLines.length + ' line items. Review and adjust.','success');
+}
+
+function renderWOLines() {
+  const tbody = document.getElementById('wo-lines');
+  if (!tbody) return;
+  const lines = window._woLines || [];
+  if (!lines.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px">No items yet.</td></tr>';
+    updateWOTotals(); return;
+  }
+  tbody.innerHTML = lines.map((l,i) => `
+    <tr>
+      <td><input class="input-sm" value="${l.name||''}" onchange="updateWOLine(${i},'name',this.value)" style="min-width:160px"/></td>
+      <td style="color:var(--text2)">${l.uom}</td>
+      <td><input class="input-sm" type="number" step="0.5" value="${l.qty||0}" onchange="updateWOLine(${i},'qty',parseFloat(this.value)||0)" style="width:60px"/></td>
+      <td><input class="input-sm" type="number" step="0.01" value="${l.labor||0}" onchange="updateWOLine(${i},'labor',parseFloat(this.value)||0)" style="width:70px"/></td>
+      <td style="font-weight:600">$${((l.qty||0)*(l.labor||0)).toFixed(2)}</td>
+      <td style="color:var(--text2)">$${(l.mat||0).toFixed(2)}</td>
+      <td style="color:var(--text2)">$${((l.qty||0)*(l.mat||0)).toFixed(2)}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:#ef4444;padding:2px 6px" onclick="removeWOLine(${i})">&#x2715;</button></td>
+    </tr>`).join('');
+  updateWOTotals();
+}
+
+function updateWOLine(i,field,val) {
+  if (!window._woLines?.[i]) return;
+  window._woLines[i][field] = val;
+  updateWOTotals();
+}
+
+function removeWOLine(i) {
+  window._woLines.splice(i,1);
+  renderWOLines();
+}
+
+function updateWOTotals() {
+  const lines = window._woLines || [];
+  const tl = lines.reduce((s,l)=>s+(l.qty||0)*(l.labor||0),0);
+  const tm = lines.reduce((s,l)=>s+(l.qty||0)*(l.mat||0),0);
+  const safe=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent='$'+v.toFixed(2);};
+  safe('wo-total-labor',tl); safe('wo-total-mat',tm); safe('wo-grand',tl+tm);
+}
+
+function clearWO() {
+  window._woLines=[];
+  renderWOLines();
+  ['wo-client','wo-addr','wo-num','wo-crew','wo-job','wo-notes','wo-squares',
+   'wo-chimney-avg','wo-chimney-lg','wo-chimney-sm','wo-pipejacks',
+   'wo-ridgevent','wo-satellite','wo-plywood','wo-stepflash'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+}
+
+function copyWOText() {
+  const lines=window._woLines||[];
+  const g=id=>document.getElementById(id)?.value||'';
+  const tl=lines.reduce((s,l)=>s+(l.qty||0)*(l.labor||0),0);
+  const tm=lines.reduce((s,l)=>s+(l.qty||0)*(l.mat||0),0);
+  let text=`WORK ORDER #${g('wo-num')}\n${g('wo-date')}\nClient: ${g('wo-client')}\nAddress: ${g('wo-addr')}\nCrew: ${g('wo-crew')}\n\n`;
+  lines.forEach(l=>{text+=`${l.name.padEnd(45)} ${String(l.qty).padStart(6)} ${(l.uom||'').padEnd(6)} Labor: $${((l.qty||0)*(l.labor||0)).toFixed(2)}\n`;});
+  text+=`\nTotal Labor: $${tl.toFixed(2)}\nTotal Materials: $${tm.toFixed(2)}\nGrand Total: $${(tl+tm).toFixed(2)}`;
+  const n=g('wo-notes'); if(n) text+=`\n\nSpecial Instructions:\n${n}`;
+  navigator.clipboard.writeText(text).then(()=>showToast('Copied!','success')).catch(()=>showToast('Copy failed','error'));
+}
+
+// ── Re-declare switchDocTab to init panels on demand ─────────
+function switchDocTab(tab) {
+  document.querySelectorAll('.doc-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.db-tab').forEach(t=>t.classList.remove('active'));
+  const panel=document.getElementById('panel-'+tab);
+  const tabEl=document.querySelector(`.db-tab[onclick*="'${tab}'"]`);
+  if(panel) panel.classList.add('active');
+  if(tabEl) tabEl.classList.add('active');
+  if(tab==='matorder'){
+    const inner=document.getElementById('mo-panel-inner');
+    if(inner&&!inner._built){inner.innerHTML=buildMOPanel();inner._built=true;updateMOTrade();window._moLines=window._moLines||[];renderMOLines();}
+  }
+  if(tab==='workorder'){
+    const inner=document.getElementById('wo-panel-inner');
+    if(inner&&!inner._built){inner.innerHTML=buildWOPanel();inner._built=true;window._woLines=window._woLines||[];renderWOLines();}
+  }
 }
 
 </script>
