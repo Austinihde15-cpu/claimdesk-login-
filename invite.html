@@ -166,7 +166,8 @@ input[readonly] { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
     <div class="success-box">
       <div class="icon">&#x1F389;</div>
       <h2>Account Activated!</h2>
-      <p>Taking you to ClaimDesk&hellip;</p>
+      <p style="color:#475569;font-size:14px;">Taking you straight to your dashboard&hellip;</p>
+      <div style="margin-top:16px;width:32px;height:32px;border:3px solid #1345A8;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;margin-left:auto;margin-right:auto;"></div>
     </div>
   </div>
 </div>
@@ -245,7 +246,22 @@ async function submit() {
     });
     if (r.ok) {
       show('view-success');
-      setTimeout(() => { window.location.href = 'https://myelitetrack.com'; }, 1800);
+      // Auto-login so they land on the dashboard immediately — no need to sign in again
+      try {
+        const loginRes = await callFn('authLogin', { email: document.getElementById('f-email').value, password: pass });
+        if (loginRes.ok && loginRes.user) {
+          // Store session exactly as the main app expects it
+          const session = { user: loginRes.user, company: loginRes.company, expires: Date.now() + (8 * 60 * 60 * 1000) };
+          localStorage.setItem('claimdesk_session', JSON.stringify(session));
+          // Mark tutorial as NOT done so new user sees it (tutorial → dashboard)
+          localStorage.removeItem('claimdesk_tutorial_done');
+        }
+      } catch(e) {
+        // Auto-login failed — they'll just need to sign in manually, no big deal
+        console.warn('Auto-login after invite failed:', e);
+      }
+      // Redirect to dashboard (session cookie will auto-sign them in)
+      setTimeout(() => { window.location.href = 'https://myelitetrack.com'; }, 1200);
     } else {
       msg.textContent = r.error || 'Activation failed. Please try again.';
       btn.disabled = false;
