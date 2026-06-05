@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<title>Create Your ClaimDesk Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(150deg, #001A40 0%, #002868 45%, #B22234 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 44px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.40);
+  position: relative;
+}
+.flag-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #B22234 0%, #B22234 33.3%, #fff 33.3%, #fff 66.6%, #002868 66.6%, #002868 100%);
+  border-radius: 20px 20px 0 0;
+}
+.logo { text-align: center; margin-bottom: 28px; }
+.logo img { height: 64px; width: auto; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.20); margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto; }
+.logo h1 { font-size: 26px; font-weight: 900; color: #001A40; letter-spacing: -0.03em; }
+.logo p { font-size: 13px; color: #64748B; font-weight: 500; margin-top: 4px; }
+.divider { height: 3px; background: linear-gradient(90deg, #B22234, #fff 50%, #002868); border-radius: 2px; width: 80px; margin: 10px auto 0; }
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: 5px;
+  margin-top: 14px;
+}
+input[type=text], input[type=email], input[type=password] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #0F172A;
+  background: #F8F9FB;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus { border-color: #1345A8; box-shadow: 0 0 0 3px rgba(19,69,168,.10); }
+input[readonly] { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
+.btn-create {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #15803D, #14532D);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(21,128,61,0.30);
+  font-family: inherit;
+  letter-spacing: .01em;
+  margin-top: 22px;
+  transition: opacity .15s;
+}
+.btn-create:hover { opacity: .92; }
+.btn-create:disabled { opacity: .6; cursor: not-allowed; }
+.msg { font-size: 13px; text-align: center; margin-top: 12px; min-height: 18px; font-weight: 600; color: #B22234; }
+.spinner { width: 28px; height: 28px; border: 3px solid #1345A8; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+.verified-badge {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 9px;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: #1345A8;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+  margin-top: 16px;
+}
+.error-box { text-align: center; padding: 20px 0; }
+.error-box .icon { font-size: 48px; margin-bottom: 12px; }
+.error-box h2 { font-size: 18px; font-weight: 800; color: #B22234; margin-bottom: 8px; }
+.error-box p { font-size: 13px; color: #64748B; margin-bottom: 20px; line-height: 1.5; }
+.btn-back {
+  display: inline-block;
+  padding: 11px 28px;
+  background: linear-gradient(135deg, #1345A8, #002868);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+.success-box { text-align: center; padding: 20px 0; }
+.success-box .icon { font-size: 48px; margin-bottom: 12px; }
+.success-box h2 { font-size: 20px; font-weight: 800; color: #15803D; margin-bottom: 8px; }
+.success-box p { font-size: 13px; color: #64748B; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="flag-bar"></div>
+  <div class="logo">
+    <img src="https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files/mp/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" alt="Cox Roofing"/>
+    <h1>ClaimDesk</h1>
+    <p>Cox Roofing &amp; Restoration</p>
+    <div class="divider"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="view-loading" style="text-align:center;padding:24px 0;">
+    <div class="spinner"></div>
+    <p style="color:#64748B;font-size:14px;">Verifying your invite link&hellip;</p>
+  </div>
+
+  <!-- FORM -->
+  <div id="view-form" style="display:none;">
+    <div class="verified-badge">&#x2705; Invite verified &mdash; create your password to activate</div>
+    <label>Your Full Name</label>
+    <input type="text" id="f-name" placeholder="First and last name" autocomplete="name"/>
+    <label>Email Address</label>
+    <input type="email" id="f-email" readonly/>
+    <label>Choose Password</label>
+    <input type="password" id="f-pass" placeholder="Min 6 characters" autocomplete="new-password"
+      onkeydown="if(event.key==='Enter')document.getElementById('f-confirm').focus()"/>
+    <label>Confirm Password</label>
+    <input type="password" id="f-confirm" placeholder="Re-enter your password" autocomplete="new-password"
+      onkeydown="if(event.key==='Enter')submit()"/>
+    <button class="btn-create" id="f-btn" onclick="submit()">Create My Account &#x2192;</button>
+    <div class="msg" id="f-msg"></div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="view-error" style="display:none;">
+    <div class="error-box">
+      <div class="icon">&#x274C;</div>
+      <h2>Invalid or Expired Invite</h2>
+      <p>This invite link has already been used or has expired.<br/>Contact your admin for a new invite link.</p>
+      <a href="https://myelitetrack.com" class="btn-back">Back to Sign In</a>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div id="view-success" style="display:none;">
+    <div class="success-box">
+      <div class="icon">&#x1F389;</div>
+      <h2>Account Activated!</h2>
+      <p>Taking you to ClaimDesk&hellip;</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_URL = 'https://v-edb7126c.base44.app';
+let _token = null;
+let _userId = null;
+
+async function callFn(name, payload) {
+  const res = await fetch(BASE_URL + '/functions/' + name, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    credentials: 'omit'
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error || 'HTTP ' + res.status);
+  }
+  return res.json();
+}
+
+function show(id) {
+  ['view-loading','view-form','view-error','view-success'].forEach(v => {
+    document.getElementById(v).style.display = v === id ? 'block' : 'none';
+  });
+}
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  _token = params.get('token');
+  if (!_token) {
+    show('view-error');
+    return;
+  }
+  try {
+    const r = await callFn('verifyInvite', { token: _token });
+    if (r.ok && r.user) {
+      _userId = r.user.id;
+      document.getElementById('f-email').value = r.user.email || '';
+      document.getElementById('f-name').value  = r.user.full_name || '';
+      show('view-form');
+      setTimeout(() => {
+        const n = document.getElementById('f-name');
+        if (n && !n.value) n.focus();
+        else document.getElementById('f-pass').focus();
+      }, 100);
+    } else {
+      show('view-error');
+    }
+  } catch(e) {
+    show('view-error');
+  }
+}
+
+async function submit() {
+  const name    = (document.getElementById('f-name').value || '').trim();
+  const pass    = document.getElementById('f-pass').value || '';
+  const confirm = document.getElementById('f-confirm').value || '';
+  const msg     = document.getElementById('f-msg');
+  const btn     = document.getElementById('f-btn');
+  msg.textContent = '';
+  msg.style.color = '#B22234';
+  if (!name)           { msg.textContent = 'Please enter your full name.'; return; }
+  if (pass.length < 6) { msg.textContent = 'Password must be at least 6 characters.'; return; }
+  if (pass !== confirm){ msg.textContent = 'Passwords do not match.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+  try {
+    const r = await callFn('acceptInvite', {
+      token: _token,
+      user_id: _userId,
+      full_name: name,
+      password: pass
+    });
+    if (r.ok) {
+      show('view-success');
+      setTimeout(() => { window.location.href = 'https://myelitetrack.com'; }, 1800);
+    } else {
+      msg.textContent = r.error || 'Activation failed. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Create My Account →';
+    }
+  } catch(e) {
+    msg.textContent = e.message || 'Something went wrong. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Create My Account →';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
