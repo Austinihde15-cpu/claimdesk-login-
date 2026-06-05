@@ -4326,7 +4326,13 @@ const TUTORIAL_URL = 'https://base44.app/api/apps/6a0ec85f9e963ce8edb7126c/files
 
 function checkAndShowTutorial() {
   const done = localStorage.getItem('claimdesk_tutorial_done');
-  if (done) return; // already watched
+  if (done) {
+    // Already completed — go straight to dashboard
+    if (typeof goto === 'function') goto('dashboard');
+    else if (typeof loadDashboard === 'function') loadDashboard();
+    return;
+  }
+  // First time — show the tutorial, dashboard loads after acknowledgement
   showTutorialModal();
 }
 
@@ -4353,9 +4359,25 @@ function showTutorialModal() {
       if (ol) {
         ol.style.transition = 'opacity 0.5s';
         ol.style.opacity = '0';
-        setTimeout(() => ol.remove(), 500);
+        setTimeout(() => {
+          ol.remove();
+          // Mark tutorial permanently done for this user
+          localStorage.setItem('claimdesk_tutorial_done', 'true');
+          localStorage.setItem('claimdesk_tutorial_date', new Date().toISOString());
+          // Navigate to their dashboard
+          showToast('\u2705 Tutorial complete! Welcome to ClaimDesk.', 'success');
+          if (typeof goto === 'function') {
+            goto('dashboard');
+          } else if (typeof loadDashboard === 'function') {
+            loadDashboard();
+          }
+        }, 500);
+      } else {
+        // Overlay already gone — still navigate
+        localStorage.setItem('claimdesk_tutorial_done', 'true');
+        showToast('\u2705 Tutorial complete! Welcome to ClaimDesk.', 'success');
+        if (typeof goto === 'function') goto('dashboard');
       }
-      showToast('&#x2705; Tutorial complete! Welcome to ClaimDesk.', 'success');
     }
   });
 }
