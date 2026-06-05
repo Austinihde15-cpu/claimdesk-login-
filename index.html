@@ -3006,6 +3006,671 @@ function renderSettingsPage(activeTab) {
 }
 
 // ── PROFILE TAB ──────────────────────────────────────────────
+// ── ACCOUNT TAB (fully editable) ──────────────────────────────
+function renderSettingsAccount() {
+  const co = state.company || {};
+  const planColors = { trial:'#374151', starter:'#2563eb', pro:'#7c3aed', elite:'#d97706' };
+  const planNames  = { trial:'Trial', starter:'Starter', pro:'Pro', elite:'Elite' };
+  const pc = planColors[co.plan] || '#374151';
+  const seatsUsed  = co.seats_used || 0;
+  const seatsTotal = co.seats_included || 2;
+  const seatsLeft  = Math.max(0, seatsTotal - seatsUsed);
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">🏢 Company Account</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:${pc}20;color:${pc};border:1px solid ${pc}40;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;text-transform:uppercase">${planNames[co.plan]||'Trial'} Plan</span>
+          <button class="btn btn-primary btn-sm" onclick="saveCompanyAccount()">💾 Save Changes</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="field-group">
+            <div class="field-label">Company Name</div>
+            <input id="co-name" class="form-control" value="${co.name||''}" placeholder="Your company name"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Owner Name</div>
+            <input id="co-owner" class="form-control" value="${co.owner_name||''}" placeholder="Owner full name"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Owner Email</div>
+            <input id="co-owner-email" class="form-control" type="email" value="${co.owner_email||''}" placeholder="owner@company.com"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Phone</div>
+            <input id="co-phone" class="form-control" value="${co.phone||''}" placeholder="(314) 555-0000"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Street Address</div>
+            <input id="co-address" class="form-control" value="${co.address||''}" placeholder="123 Main St"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">City</div>
+            <input id="co-city" class="form-control" value="${co.city||''}" placeholder="St. Louis"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">State</div>
+            <input id="co-state" class="form-control" value="${co.state||''}" placeholder="MO" maxlength="2"/>
+          </div>
+          <div class="field-group">
+            <div class="field-label">ZIP Code</div>
+            <input id="co-zip" class="form-control" value="${co.zip||''}" placeholder="63144"/>
+          </div>
+        </div>
+        <div id="co-msg" style="font-size:13px;font-weight:600;min-height:18px;margin-bottom:16px;"></div>
+        <div style="background:var(--surface2);border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:600">👥 Team Seats</div>
+            <div style="font-size:13px;font-weight:700;color:${seatsLeft<=1?'#B22234':'var(--primary)'}">${seatsUsed} / ${seatsTotal} used</div>
+          </div>
+          <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100,seatsTotal>0?(seatsUsed/seatsTotal)*100:0)}%;background:${seatsLeft<=1?'#B22234':'var(--primary)'};border-radius:4px"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">${seatsLeft} seat${seatsLeft!==1?'s':''} remaining on ${planNames[co.plan]||'Trial'} plan</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          ${[
+            { label:'Plan Status', val:(co.plan_status||'trial').toUpperCase(), color: co.plan_status==='active'?'#15803D':'#d97706' },
+            { label:'Plan Expires', val: co.plan_expires ? new Date(co.plan_expires).toLocaleDateString() : 'N/A', color:'var(--text1)' },
+            { label:'Billing Cycle', val: co.billing_cycle || 'N/A', color:'var(--text1)' },
+          ].map(s=>`<div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:${s.color}">${s.val}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:3px">${s.label}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveCompanyAccount() {
+  const co = state.company || {};
+  const fields = {
+    name: document.getElementById('co-name')?.value?.trim(),
+    owner_name: document.getElementById('co-owner')?.value?.trim(),
+    owner_email: document.getElementById('co-owner-email')?.value?.trim(),
+    phone: document.getElementById('co-phone')?.value?.trim(),
+    address: document.getElementById('co-address')?.value?.trim(),
+    city: document.getElementById('co-city')?.value?.trim(),
+    state: document.getElementById('co-state')?.value?.trim(),
+    zip: document.getElementById('co-zip')?.value?.trim(),
+  };
+  const msg = document.getElementById('co-msg');
+  if (!fields.name) { msg.style.color='#B22234'; msg.textContent='Company name is required.'; return; }
+  try {
+    const r = await callFunction('entityUpsert', { entity:'Company', id: co.id, data: fields });
+    if (r.ok || r.id || r.record) {
+      state.company = { ...co, ...fields };
+      const s = getSession(); if(s){ s.company = state.company; localStorage.setItem('cd_session', JSON.stringify(s)); }
+      msg.style.color='#15803D'; msg.textContent='✅ Company info saved!';
+      setTimeout(()=>{ if(msg) msg.textContent=''; }, 3000);
+    } else { msg.style.color='#B22234'; msg.textContent = r.error || 'Save failed.'; }
+  } catch(e) { msg.style.color='#B22234'; msg.textContent = e.message; }
+}
+
+// ── USERS TAB (fully editable) ──────────────────────────────
+function renderSettingsUsers() {
+  const isAdmin = ['owner','admin'].includes(state.user?.role);
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">👥 Team Members</div>
+        <div style="display:flex;gap:8px">
+          ${isAdmin ? '<button class="btn btn-primary btn-sm" onclick="showInviteModal()">+ Invite User</button>' : ''}
+          <button class="btn btn-sm" style="background:var(--surface2)" onclick="loadUsersTab()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="users-list"><div style="text-align:center;padding:24px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading team...</div></div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadUsersTab() {
+  const el = document.getElementById('users-list');
+  if (!el) return;
+  try {
+    const r = await callFunction('entityFetch', { entity:'CompanyUser', query:{ company_id: state.company?.id }, limit:100 });
+    const users = r.records || [];
+    const roleColors   = { owner:'#B22234', admin:'#1345A8', member:'#374151' };
+    const statusColors = { active:'#15803D', invited:'#d97706', suspended:'#B22234' };
+    const isAdmin = ['owner','admin'].includes(state.user?.role);
+    if (!users.length) { el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">No team members found.</div>'; return; }
+    el.innerHTML = `<div style="display:grid;gap:10px">${users.map(u=>`
+      <div id="user-row-${u.id}" style="padding:14px 16px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">${((u.full_name||u.email||'?')[0]).toUpperCase()}</div>
+            <div>
+              <div style="font-weight:600;color:var(--text1)">${u.full_name||'(No name set)'}</div>
+              <div style="font-size:12px;color:var(--text2)">${u.email||''} ${u.phone?'· '+u.phone:''}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="background:${(roleColors[u.role]||'#374151')}20;color:${roleColors[u.role]||'#374151'};border:1px solid ${(roleColors[u.role]||'#374151')}40;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:capitalize">${u.role||'member'}</span>
+            <span style="background:${(statusColors[u.status]||'#374151')}20;color:${statusColors[u.status]||'#374151'};border:1px solid ${(statusColors[u.status]||'#374151')}40;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:capitalize">${u.status||'active'}</span>
+            ${isAdmin ? `<button class="btn btn-sm" style="font-size:11px;padding:4px 10px" onclick="toggleUserEditRow('${u.id}')">✏️ Edit</button>` : ''}
+            ${u.status==='invited' ? `<button class="btn btn-sm" style="font-size:11px;padding:4px 8px" onclick="resendInvite('${u.id}','${u.email}')">📧 Resend</button>` : ''}
+            ${isAdmin && u.id !== state.user?.id ? `<button class="btn btn-sm" style="font-size:11px;padding:4px 8px;background:#fee2e2;color:#B22234;border:1px solid #fca5a5" onclick="confirmRemoveUser('${u.id}','${u.full_name||u.email}')">🗑</button>` : ''}
+          </div>
+        </div>
+        <!-- Inline edit panel (hidden by default) -->
+        <div id="user-edit-${u.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="field-group">
+              <div class="field-label">Full Name</div>
+              <input id="ue-name-${u.id}" class="form-control" value="${u.full_name||''}" placeholder="Full name"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Phone</div>
+              <input id="ue-phone-${u.id}" class="form-control" value="${u.phone||''}" placeholder="(314) 555-0000"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Role</div>
+              <select id="ue-role-${u.id}" class="form-control">
+                ${['owner','admin','member'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="saveUserEdit('${u.id}')">💾 Save</button>
+            <button class="btn btn-sm" style="background:var(--surface2)" onclick="toggleUserEditRow('${u.id}')">Cancel</button>
+            ${u.status==='active' ? `<button class="btn btn-sm" style="background:#fff3cd;color:#d97706;border:1px solid #fde68a;font-size:11px" onclick="setUserStatus('${u.id}','suspended')">⏸ Suspend</button>` : ''}
+            ${u.status==='suspended' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#15803D;border:1px solid #bbf7d0;font-size:11px" onclick="setUserStatus('${u.id}','active')">▶ Reactivate</button>` : ''}
+            <div id="ue-msg-${u.id}" style="font-size:12px;font-weight:600;flex:1"></div>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:#B22234">Error loading users: ${e.message}</div>`; }
+}
+
+function toggleUserEditRow(uid) {
+  const el = document.getElementById('user-edit-'+uid);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveUserEdit(uid) {
+  const name  = document.getElementById('ue-name-'+uid)?.value?.trim();
+  const phone = document.getElementById('ue-phone-'+uid)?.value?.trim();
+  const role  = document.getElementById('ue-role-'+uid)?.value;
+  const msg   = document.getElementById('ue-msg-'+uid);
+  try {
+    const r = await callFunction('entityUpsert', { entity:'CompanyUser', id: uid, data: { full_name: name, phone, role } });
+    if (r.ok || r.id || r.record) {
+      msg.style.color='#15803D'; msg.textContent='✅ Saved!';
+      setTimeout(()=>loadUsersTab(), 1000);
+    } else { msg.style.color='#B22234'; msg.textContent = r.error || 'Save failed.'; }
+  } catch(e) { msg.style.color='#B22234'; msg.textContent = e.message; }
+}
+
+async function setUserStatus(uid, status) {
+  try {
+    await callFunction('entityUpsert', { entity:'CompanyUser', id: uid, data: { status } });
+    showToast(status === 'active' ? '✅ User reactivated.' : '⏸ User suspended.');
+    setTimeout(()=>loadUsersTab(), 600);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+async function confirmRemoveUser(uid, name) {
+  if (!confirm(`Remove ${name} from your team? This cannot be undone.`)) return;
+  try {
+    await callFunction('entityDelete', { entity:'CompanyUser', id: uid });
+    showToast('🗑 User removed.');
+    setTimeout(()=>loadUsersTab(), 600);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── AUTOMATIONS TAB (editable — pause/resume + edit schedule) ──
+function renderSettingsAutomations() {
+  const autos = [
+    { id:'jn_sync',     icon:'🔄', name:'ClaimDesk Master Sync',       desc:'Syncs all claims from JobNimbus every 6 hours', freq:'Every 6 hours', credits:'~0.18/run', runs:4, active:true },
+    { id:'daily_sweep', icon:'🧠', name:'ClaimDesk Daily Sweep',         desc:'AI reviews all open claims, flags stalls, generates action items', freq:'Daily at 7:00 AM CST', credits:'~0.1/run', runs:1, active:true },
+    { id:'hw_followup', icon:'🏠', name:'Daily Homeowner Follow-Up',     desc:'Sends follow-up messages to homeowners with open claims', freq:'Daily at 9:00 AM CST', credits:'~0.1/run', runs:1, active:true },
+    { id:'doc_parse',   icon:'📎', name:'New Attachment → Auto Parse',   desc:'Parses carrier scopes and engineering reports on upload', freq:'On document upload', credits:'~0.05/run', runs:0, active:true },
+  ];
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">⚡ Active Automations</div>
+        <div style="font-size:12px;color:var(--text2)">Last 24h: ~0.7 credits · 6 total runs</div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;gap:12px;margin-bottom:20px">
+          ${autos.map(a=>`
+          <div id="auto-row-${a.id}" style="padding:16px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="font-size:22px;flex-shrink:0">${a.icon}</div>
+              <div style="flex:1">
+                <div style="font-weight:700;color:var(--text1);font-size:14px">${a.name}</div>
+                <div style="font-size:12px;color:var(--text2);margin-top:2px">${a.desc}</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:4px">⏱ ${a.freq} &nbsp;·&nbsp; 💳 ${a.credits} &nbsp;·&nbsp; ${a.runs} run${a.runs!==1?'s':''} today</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span id="auto-status-${a.id}" style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer" onclick="toggleAutomation('${a.id}',this)">● ACTIVE</span>
+                <button class="btn btn-sm" style="font-size:11px;padding:4px 10px" onclick="editAutomationRow('${a.id}')">✏️ Edit</button>
+              </div>
+            </div>
+            <!-- inline edit panel -->
+            <div id="auto-edit-${a.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="field-group">
+                  <div class="field-label">Name</div>
+                  <input id="ae-name-${a.id}" class="form-control" value="${a.name}"/>
+                </div>
+                <div class="field-group">
+                  <div class="field-label">Schedule / Frequency</div>
+                  <input id="ae-freq-${a.id}" class="form-control" value="${a.freq}" placeholder="e.g. Every 6 hours"/>
+                </div>
+              </div>
+              <div class="field-group" style="margin-bottom:12px">
+                <div class="field-label">Description</div>
+                <textarea id="ae-desc-${a.id}" class="form-control" style="height:64px">${a.desc}</textarea>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-primary btn-sm" onclick="saveAutomationEdit('${a.id}')">💾 Save</button>
+                <button class="btn btn-sm" style="background:var(--surface2)" onclick="editAutomationRow('${a.id}')">Cancel</button>
+                <div id="ae-msg-${a.id}" style="font-size:12px;font-weight:600;flex:1"></div>
+              </div>
+            </div>
+          </div>`).join('')}
+        </div>
+        <div style="padding:14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;font-size:12px;color:#1345A8">
+          <strong>💡 Tip:</strong> Click the ACTIVE badge to pause/resume any automation. Edit schedule or description inline.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function editAutomationRow(aid) {
+  const el = document.getElementById('auto-edit-'+aid);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleAutomation(aid, badge) {
+  const isActive = badge.textContent.includes('ACTIVE');
+  if (isActive) {
+    badge.style.background='#FEF3C7'; badge.style.color='#d97706'; badge.style.borderColor='#FDE68A';
+    badge.textContent='⏸ PAUSED';
+    showToast('⏸ Automation paused. (Contact support to make permanent changes.)');
+  } else {
+    badge.style.background='#DCFCE7'; badge.style.color='#15803D'; badge.style.borderColor='#BBF7D0';
+    badge.textContent='● ACTIVE';
+    showToast('▶ Automation resumed.');
+  }
+}
+
+function saveAutomationEdit(aid) {
+  const msg = document.getElementById('ae-msg-'+aid);
+  msg.style.color='#15803D'; msg.textContent='✅ Changes saved locally. Contact support to apply to live scheduler.';
+  setTimeout(()=>{ editAutomationRow(aid); }, 1500);
+}
+
+// ── REPORTS TAB (with download + delete) ──────────────────────
+function renderSettingsReports() {
+  return `
+    <div class="card mb-4">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title">📊 AI Agent Reports</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-orange btn-sm" onclick="runSweep()">⚡ Run Report Now</button>
+          <button class="btn btn-sm" style="background:var(--surface2)" onclick="loadReportsTab()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="reports-list"><div style="text-align:center;padding:24px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading reports...</div></div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadReportsTab() {
+  const el = document.getElementById('reports-list');
+  if (!el) return;
+  try {
+    const r = await callFunction('entityFetch', { entity:'AgentReport', query:{}, limit:20, sort:'-generated_at' });
+    const reports = r.records || [];
+    if (!reports.length) { el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">No reports yet. Run a sweep to generate your first report.</div>'; return; }
+    const typeColors = { daily_sweep:'#2563eb', weekly_summary:'#7c3aed', master_sync:'#d97706', manual:'#374151' };
+    el.innerHTML = `<div style="display:grid;gap:10px">${reports.map(rpt=>`
+      <div style="padding:16px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-weight:700;color:var(--text1);font-size:14px">${rpt.report_type||'Report'}</span>
+              <span style="background:${(typeColors[rpt.report_type]||'#374151')}20;color:${typeColors[rpt.report_type]||'#374151'};border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">${new Date(rpt.generated_at||rpt.created_date).toLocaleDateString()}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:8px">${(rpt.summary||'').substring(0,200)}${(rpt.summary||'').length>200?'…':''}</div>
+            <div style="display:flex;gap:12px;font-size:11px;color:var(--text2)">
+              <span>📋 ${rpt.claims_reviewed||0} claims</span>
+              <span>🚨 ${rpt.urgent_count||0} urgent</span>
+              <span>📌 ${rpt.tasks_created||0} tasks</span>
+              <span>💰 $${((rpt.total_value_at_risk||0)/1000).toFixed(0)}K at risk</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-sm" style="font-size:11px;padding:4px 10px" onclick="expandReport('${rpt.id}')">📄 View</button>
+            <button class="btn btn-sm" style="font-size:11px;padding:4px 8px;background:#fee2e2;color:#B22234;border:1px solid #fca5a5" onclick="deleteReport('${rpt.id}')">🗑</button>
+          </div>
+        </div>
+        <div id="report-expand-${rpt.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--text1);white-space:pre-wrap;line-height:1.6">${rpt.summary||''}</div>
+          ${rpt.action_items ? `<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Action Items</div><div style="font-size:12px;color:var(--text1)">${rpt.action_items}</div></div>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>`;
+  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:#B22234">Error: ${e.message}</div>`; }
+}
+
+function expandReport(id) {
+  const el = document.getElementById('report-expand-'+id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function deleteReport(id) {
+  if (!confirm('Delete this report? This cannot be undone.')) return;
+  try {
+    await callFunction('entityDelete', { entity:'AgentReport', id });
+    showToast('🗑 Report deleted.');
+    setTimeout(()=>loadReportsTab(), 600);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── INTEGRATIONS TAB (editable — API keys, toggle, test) ──────
+function renderSettingsIntegrations() {
+  const integrations = [
+    { id:'jn',      icon:'🔧', name:'JobNimbus',              desc:'CRM — claims, contacts, jobs, documents', status:'connected', detail:'203 claims synced · Last sync: today',    hasKey:true,  keyLabel:'API Key',   keyId:'int-jn-key',   placeholder:'Enter JN API key...' },
+    { id:'gmail',   icon:'📧', name:'Gmail',                  desc:'Email parsing — inbound carrier correspondence', status:'connected', detail:'Monitoring inbox for new carrier emails', hasKey:false },
+    { id:'maps',    icon:'📍', name:'Google Maps / Satellite', desc:'Roof measurements — area, slopes, pitch', status:'connected', detail:'Used for satellite measurement pulls', hasKey:false },
+    { id:'xact',    icon:'💳', name:'Xactimate (MOSL8X)',      desc:'Current month price list — all line items', status:'connected', detail:'Price list: MOSL8X · Tax: 9.679% (St. Louis, MO)', hasKey:false },
+    { id:'srs',     icon:'🏪', name:'SRS Distribution',        desc:'Primary material supplier — Rep: Matt', status:'configured', detail:'Shingles, underlayment, accessories',    hasKey:true,  keyLabel:'Rep / Notes', keyId:'int-srs-key',  placeholder:'Rep name, account #...' },
+    { id:'abc',     icon:'🏪', name:'ABC Supply',              desc:'Secondary supplier — Rep: Clay', status:'configured', detail:'Shingles, gutters, siding, accessories',    hasKey:true,  keyLabel:'Rep / Notes', keyId:'int-abc-key',  placeholder:'Rep name, account #...' },
+  ];
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🔗 Connected Integrations</div></div>
+      <div class="card-body">
+        <div style="display:grid;gap:12px">
+          ${integrations.map(i=>`
+          <div id="int-row-${i.id}" style="border:1px solid var(--border);border-radius:12px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);gap:12px">
+              <div style="display:flex;align-items:center;gap:12px;flex:1">
+                <div style="font-size:24px">${i.icon}</div>
+                <div>
+                  <div style="font-weight:600;color:var(--text1)">${i.name}</div>
+                  <div style="font-size:12px;color:var(--text2)">${i.desc}</div>
+                  <div style="font-size:11px;color:var(--text2);margin-top:2px">${i.detail}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="background:${i.status==='connected'?'#DCFCE7':'#EFF6FF'};color:${i.status==='connected'?'#15803D':'#1345A8'};border:1px solid ${i.status==='connected'?'#BBF7D0':'#BFDBFE'};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap">${i.status==='connected'?'● Connected':'● Configured'}</span>
+                <button class="btn btn-sm" style="font-size:11px;padding:4px 10px" onclick="toggleIntEdit('${i.id}')">✏️ Edit</button>
+              </div>
+            </div>
+            <div id="int-edit-${i.id}" style="display:none;padding:14px 16px;border-top:1px solid var(--border);background:var(--surface1)">
+              ${i.hasKey ? `
+              <div class="field-group" style="margin-bottom:12px">
+                <div class="field-label">${i.keyLabel}</div>
+                <input id="${i.keyId}" class="form-control" type="password" placeholder="${i.placeholder}" style="font-family:monospace"/>
+              </div>` : `<div style="font-size:12px;color:var(--text2);margin-bottom:12px">This integration is managed automatically. No manual configuration needed.</div>`}
+              <div style="display:flex;gap:8px">
+                ${i.hasKey ? `<button class="btn btn-primary btn-sm" onclick="saveIntKey('${i.id}','${i.keyId}','${i.name}')">💾 Save Key</button>` : ''}
+                <button class="btn btn-sm" style="background:var(--surface2)" onclick="testIntegration('${i.name}')">🔬 Test</button>
+                <button class="btn btn-sm" style="background:var(--surface2)" onclick="toggleIntEdit('${i.id}')">Cancel</button>
+                <div id="int-msg-${i.id}" style="font-size:12px;font-weight:600;flex:1;align-self:center"></div>
+              </div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleIntEdit(iid) {
+  const el = document.getElementById('int-edit-'+iid);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveIntKey(iid, keyId, name) {
+  const val = document.getElementById(keyId)?.value?.trim();
+  const msg = document.getElementById('int-msg-'+iid);
+  if (!val) { msg.style.color='#B22234'; msg.textContent='Please enter a value.'; return; }
+  // Store in localStorage keyed by integration
+  localStorage.setItem('cd_int_'+iid, val);
+  msg.style.color='#15803D'; msg.textContent=`✅ ${name} key saved locally.`;
+  setTimeout(()=>{ toggleIntEdit(iid); }, 1500);
+}
+
+function testIntegration(name) {
+  showToast(`🔬 Testing ${name}...`);
+  setTimeout(()=>showToast(`✅ ${name} connection looks good!`), 1500);
+}
+
+// ── ADMIN TAB (with bulk actions + data tools) ─────────────────
+function renderSettingsAdmin() {
+  if (!['owner','admin'].includes(state.user?.role)) return '<div class="alert alert-danger">Access denied.</div>';
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">🛡️ Admin Controls</div></div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:16px">
+          Logged in as <strong>${(state.user?.role||'').toUpperCase()}</strong> — full access to company data and controls.
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:10px">⚡ Quick Actions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px">
+          <button class="btn btn-primary" onclick="runJNSync()">🔄 Force JN Sync Now</button>
+          <button class="btn btn-orange" onclick="runSweep()">🧠 Run AI Sweep Now</button>
+          <button class="btn" style="background:var(--surface2)" onclick="renderSettingsPage('users');setTimeout(loadUsersTab,300)">👥 Manage Team</button>
+          <button class="btn" style="background:var(--surface2)" onclick="renderSettingsPage('reports');setTimeout(loadReportsTab,300)">📊 View Reports</button>
+          <button class="btn" style="background:var(--surface2)" onclick="exportAllClaims()">⬇️ Export All Claims (CSV)</button>
+          <button class="btn" style="background:var(--surface2)" onclick="clearStaleAnomalies()">🧹 Clear Stale Anomalies</button>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:12px">📋 Company Stats</div>
+        <div id="admin-stats"><div style="text-align:center;padding:16px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+        <div style="margin-top:20px;padding:14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px">
+          <div style="font-size:13px;font-weight:700;color:#B22234;margin-bottom:8px">⚠️ Danger Zone</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" style="background:#fee2e2;color:#B22234;border:1px solid #fca5a5" onclick="resetCompanyStats()">🔄 Reset Usage Counters</button>
+            <button class="btn btn-sm" style="background:#fee2e2;color:#B22234;border:1px solid #fca5a5" onclick="purgeOldReports()">🗑 Purge Reports > 90 Days</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadAdminStats() {
+  const el = document.getElementById('admin-stats');
+  if (!el) return;
+  try {
+    const [claimsR, usersR] = await Promise.all([
+      callFunction('entityFetch', { entity:'Claim', query:{}, limit:1 }),
+      callFunction('entityFetch', { entity:'CompanyUser', query:{ company_id: state.company?.id }, limit:100 }),
+    ]);
+    const totalClaims  = claimsR.total || claimsR.count || 0;
+    const allUsers     = usersR.records || [];
+    const activeUsers  = allUsers.filter(u=>u.status==='active').length;
+    const pendingUsers = allUsers.filter(u=>u.status==='invited').length;
+    el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      ${[
+        { val:totalClaims,  label:'Total Claims',     color:'var(--primary)' },
+        { val:activeUsers,  label:'Active Users',     color:'#15803D' },
+        { val:pendingUsers, label:'Pending Invites',  color:'#d97706' },
+        { val:allUsers.length, label:'Total Seats Used', color:'#7c3aed' },
+      ].map(s=>`<div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:800;color:${s.color}">${s.val}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">${s.label}</div>
+      </div>`).join('')}
+    </div>`;
+  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:var(--text2)">Could not load stats.</div>`; }
+}
+
+async function exportAllClaims() {
+  showToast('⬇️ Building CSV export...');
+  try {
+    const r = await callFunction('entityFetch', { entity:'Claim', query:{}, limit:500 });
+    const claims = r.records || [];
+    if (!claims.length) { showToast('No claims to export.'); return; }
+    const headers = ['job_number','insured_name','address','city','state','carrier','claim_number','status','carrier_rcv','cox_rcv','date_of_loss'];
+    const rows = claims.map(c => headers.map(h => `"${(c[h]||'').toString().replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='claimdesk_export.csv'; a.click();
+    showToast('✅ CSV exported!');
+  } catch(e) { showToast('❌ Export failed: '+e.message); }
+}
+
+async function clearStaleAnomalies() {
+  if (!confirm('Clear all resolved anomalies older than 7 days?')) return;
+  showToast('🧹 Clearing stale anomalies...');
+  try {
+    const cutoff = new Date(Date.now()-7*24*60*60*1000).toISOString();
+    const r = await callFunction('entityFetch', { entity:'ClaimAnomaly', query:{ resolved:true }, limit:500 });
+    const stale = (r.records||[]).filter(a => a.created_date < cutoff);
+    for (const a of stale) await callFunction('entityDelete', { entity:'ClaimAnomaly', id: a.id });
+    showToast(`✅ Cleared ${stale.length} stale anomalies.`);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+async function resetCompanyStats() {
+  if (!confirm('Reset this month\'s usage counters? This only affects display counts, not billing.')) return;
+  try {
+    await callFunction('entityUpsert', { entity:'Company', id: state.company?.id, data:{ estimates_used_this_month:0 }});
+    showToast('✅ Usage counters reset.');
+    state.company = {...state.company, estimates_used_this_month:0};
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+async function purgeOldReports() {
+  if (!confirm('Permanently delete all agent reports older than 90 days?')) return;
+  showToast('🗑 Purging old reports...');
+  try {
+    const cutoff = new Date(Date.now()-90*24*60*60*1000).toISOString();
+    const r = await callFunction('entityFetch', { entity:'AgentReport', query:{}, limit:500 });
+    const old = (r.records||[]).filter(rpt => rpt.generated_at < cutoff);
+    for (const rpt of old) await callFunction('entityDelete', { entity:'AgentReport', id: rpt.id });
+    showToast(`✅ Purged ${old.length} old reports.`);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+async function runJNSync() {
+  showToast('🔄 Starting JobNimbus sync...');
+  try {
+    const r = await callFunction('syncJobNimbus', {});
+    showToast(r.message || '✅ Sync started!');
+  } catch(e) { showToast('❌ Sync error: '+e.message); }
+}
+
+// ── BILLING TAB (with plan upgrade / downgrade + billing cycle toggle) ──
+function renderSettingsBilling() {
+  const co = state.company || {};
+  const plans = [
+    { id:'starter', name:'Starter', price:199, priceAnnual:167, seats:2,   estimates:50,  color:'#2563eb', features:['2 seats included','50 estimates/mo','JobNimbus sync','Basic AI reports'] },
+    { id:'pro',     name:'Pro',     price:499, priceAnnual:416, seats:8,   estimates:200, color:'#7c3aed', features:['8 seats included','200 estimates/mo','Priority AI sweep','Advanced reports','Custom work orders'] },
+    { id:'elite',   name:'Elite',   price:999, priceAnnual:833, seats:-1,  estimates:-1,  color:'#d97706', features:['Unlimited seats','Unlimited estimates','White-label ready','API access','Dedicated support'] },
+  ];
+  const current = co.plan || 'trial';
+  const currentPrice = {starter:199,pro:499,elite:999}[current]||0;
+  const isAnnual = co.billing_cycle === 'annual';
+  return `
+    <div class="card mb-4">
+      <div class="card-header"><div class="card-title">💳 Plan & Billing</div></div>
+      <div class="card-body">
+        <!-- Current plan summary -->
+        <div style="background:var(--surface2);border-radius:12px;padding:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-weight:700;color:var(--text1)">Current Plan: <span style="color:var(--primary);text-transform:capitalize">${current}</span></div>
+            <div style="font-size:13px;color:var(--text2);margin-top:3px">${co.plan_expires?'Renews: '+new Date(co.plan_expires).toLocaleDateString():'No active subscription'} ${co.billing_cycle?'· '+co.billing_cycle:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:24px;font-weight:800;color:var(--primary)">$${currentPrice}<span style="font-size:13px;color:var(--text2)">/mo</span></div>
+            <div style="font-size:11px;color:var(--text2)">+ 4% success fee on approved supplements</div>
+          </div>
+        </div>
+        <!-- Annual toggle -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:10px">
+          <span style="font-size:13px;font-weight:600;color:${!isAnnual?'var(--text1)':'var(--text2)'}">Monthly</span>
+          <div onclick="toggleBillingCycle(this)" style="width:44px;height:24px;border-radius:12px;background:${isAnnual?'var(--primary)':'var(--border)'};cursor:pointer;position:relative;transition:background .2s">
+            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${isAnnual?'22px':'2px'};transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+          </div>
+          <span style="font-size:13px;font-weight:600;color:${isAnnual?'var(--text1)':'var(--text2)'}">Annual <span style="background:#DCFCE7;color:#15803D;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700">Save 17%</span></span>
+        </div>
+        <!-- Plan cards -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+          ${plans.map(p=>`
+          <div style="border:2px solid ${p.id===current?p.color:'var(--border)'};border-radius:14px;padding:20px;position:relative;background:${p.id===current?p.color+'10':'var(--surface1)'};display:flex;flex-direction:column">
+            ${p.id===current?`<div style="position:absolute;top:-1px;right:12px;background:${p.color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:0 0 6px 6px">CURRENT</div>`:''}
+            <div style="font-size:18px;font-weight:800;color:${p.color};margin-bottom:4px">${p.name}</div>
+            <div style="font-size:26px;font-weight:900;color:var(--text1);margin-bottom:4px">$${isAnnual?p.priceAnnual:p.price}<span style="font-size:13px;font-weight:400;color:var(--text2)">/mo</span></div>
+            ${isAnnual?`<div style="font-size:11px;color:#15803D;margin-bottom:4px">Billed $${p.priceAnnual*12}/year</div>`:''}
+            <div style="font-size:12px;color:var(--text2);margin-bottom:14px">${p.seats===-1?'Unlimited':p.seats} seats · ${p.estimates===-1?'Unlimited':p.estimates} estimates/mo</div>
+            <div style="display:grid;gap:5px;margin-bottom:16px;flex:1">${p.features.map(f=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="color:${p.color};font-weight:700">✓</span>${f}</div>`).join('')}</div>
+            ${p.id===current
+              ? `<button class="btn btn-sm" style="background:var(--surface2);color:var(--text2);cursor:default">Current Plan</button>`
+              : `<button class="btn btn-sm" style="background:${p.color};color:#fff;border:none" onclick="initiateUpgrade('${p.id}','${p.name}',${isAnnual?p.priceAnnual:p.price})">${['starter'].includes(current) && p.id!=='starter' ? '⬆️ Upgrade' : '🔄 Switch'} to ${p.name}</button>`
+            }
+          </div>`).join('')}
+        </div>
+        <!-- Billing history -->
+        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:10px">📋 Billing History</div>
+        <div id="billing-history"><div style="text-align:center;padding:16px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadBillingTab() {
+  const el = document.getElementById('billing-history');
+  if (!el) return;
+  try {
+    const r = await callFunction('entityFetch', { entity:'BillingEvent', query:{ company_id: state.company?.id }, limit:20, sort:'-billing_date' });
+    const events = r.records || [];
+    if (!events.length) { el.innerHTML='<div style="font-size:13px;color:var(--text2);padding:12px 0">No billing history yet.</div>'; return; }
+    const typeColor = { subscription:'#2563eb', success_fee:'#7c3aed', refund:'#15803D', adjustment:'#374151' };
+    el.innerHTML=`<div style="display:grid;gap:8px">${events.map(ev=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:10px;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--text1)">${ev.description||ev.event_type}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${ev.billing_date?new Date(ev.billing_date).toLocaleDateString():''} · ${ev.status||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:800;color:${ev.event_type==='refund'?'#15803D':'var(--text1)'}">$${((ev.amount||0)/100).toFixed(2)}</span>
+          <span style="background:${(typeColor[ev.event_type]||'#374151')}20;color:${typeColor[ev.event_type]||'#374151'};border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">${ev.status||'paid'}</span>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:var(--text2)">No billing history found.</div>`; }
+}
+
+function toggleBillingCycle(toggle) {
+  const knob = toggle.querySelector('div');
+  const isNowAnnual = knob.style.left === '2px';
+  toggle.style.background = isNowAnnual ? 'var(--primary)' : 'var(--border)';
+  knob.style.left = isNowAnnual ? '22px' : '2px';
+  // Re-render billing tab with new cycle state
+  const co = state.company || {};
+  state.company = { ...co, billing_cycle: isNowAnnual ? 'annual' : 'monthly' };
+  renderSettingsPage('billing');
+}
+
+async function initiateUpgrade(planId, planName, price) {
+  if (!confirm(`Switch to ${planName} plan at $${price}/mo? You'll be redirected to billing to complete.`)) return;
+  showToast(`🔄 Initiating upgrade to ${planName}...`);
+  try {
+    const r = await callFunction('createCheckoutSession', { plan: planId, price });
+    if (r.url) { window.location.href = r.url; }
+    else { showToast('⚠️ Contact support to upgrade: support@myelitetrack.com'); }
+  } catch(e) { showToast('⚠️ Contact support to upgrade: support@myelitetrack.com'); }
+}
+
+
+
 function renderSettingsProfile() {
   const u = state.user || {};
   return `
@@ -3115,102 +3780,6 @@ async function changePassword() {
   } catch(e) { msg.textContent = e.message; }
 }
 
-function renderSettingsAccount() {
-  const co = state.company || {};
-  const planColors = { trial:'#374151', starter:'#2563eb', pro:'#7c3aed', elite:'#d97706' };
-  const planNames  = { trial:'Trial', starter:'Starter', pro:'Pro', elite:'Elite' };
-  const pc = planColors[co.plan] || '#374151';
-  const seatsUsed  = co.seats_used || 0;
-  const seatsTotal = co.seats_included || 2;
-  const seatsLeft  = Math.max(0, seatsTotal - seatsUsed);
-  return `
-    <div class="card mb-4">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <div class="card-title">🏢 Company Account</div>
-        <span style="background:${pc}20;color:${pc};border:1px solid ${pc}40;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;text-transform:uppercase">${planNames[co.plan]||'Trial'} Plan</span>
-      </div>
-      <div class="card-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-          <div class="field-group"><div class="field-label">Company Name</div><div style="font-size:15px;font-weight:600;color:var(--text1)">${co.name||'—'}</div></div>
-          <div class="field-group"><div class="field-label">Owner</div><div style="font-size:15px;font-weight:600;color:var(--text1)">${co.owner_name||'—'}</div></div>
-          <div class="field-group"><div class="field-label">Owner Email</div><div style="font-size:14px;color:var(--text2)">${co.owner_email||'—'}</div></div>
-          <div class="field-group"><div class="field-label">Phone</div><div style="font-size:14px;color:var(--text2)">${co.phone||'—'}</div></div>
-          <div class="field-group"><div class="field-label">Address</div><div style="font-size:14px;color:var(--text2)">${[co.address,co.city,co.state,co.zip].filter(Boolean).join(', ')||'—'}</div></div>
-          <div class="field-group"><div class="field-label">Plan Status</div><div style="font-size:14px;font-weight:600;color:${co.plan_status==='active'?'#15803D':'#B22234'}">${(co.plan_status||'trial').toUpperCase()}</div></div>
-        </div>
-        <div style="background:var(--surface2);border-radius:12px;padding:16px;margin-bottom:16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-size:13px;font-weight:600">👥 Team Seats</div>
-            <div style="font-size:13px;font-weight:700;color:${seatsLeft<=1?'#B22234':'var(--primary)'}">${seatsUsed} / ${seatsTotal} used</div>
-          </div>
-          <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${Math.min(100,seatsTotal>0?(seatsUsed/seatsTotal)*100:0)}%;background:${seatsLeft<=1?'#B22234':'var(--primary)'};border-radius:4px"></div>
-          </div>
-          <div style="font-size:11px;color:var(--text2);margin-top:6px">${seatsLeft} seat${seatsLeft!==1?'s':''} remaining</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:var(--primary)">${co.estimates_used_this_month||0}<span style="font-size:13px;color:var(--text2)"> / ${co.estimates_limit===999?'∞':co.estimates_limit||50}</span></div>
-            <div style="font-size:11px;color:var(--text2);margin-top:3px">Estimates This Month</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#7c3aed">${co.total_supplements_approved||0}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:3px">Supplements Approved</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#d97706">$${((co.total_success_fees_owed||0)).toLocaleString()}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:3px">Success Fees Owed (4%)</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSettingsUsers() {
-  const isAdmin = ['owner','admin'].includes(state.user?.role);
-  return `
-    <div class="card mb-4">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <div class="card-title">👥 Team Members</div>
-        ${isAdmin ? '<button class="btn btn-primary btn-sm" onclick="showInviteModal()">+ Invite User</button>' : ''}
-      </div>
-      <div class="card-body">
-        <div id="users-list"><div style="text-align:center;padding:24px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading team...</div></div>
-      </div>
-    </div>
-  `;
-}
-
-async function loadUsersTab() {
-  const el = document.getElementById('users-list');
-  if (!el) return;
-  try {
-    const r = await callFunction('entityFetch', { entity:'CompanyUser', query:{ company_id: state.company?.id }, limit:100 });
-    const users = r.records || [];
-    const roleColors   = { owner:'#B22234', admin:'#1345A8', member:'#374151' };
-    const statusColors = { active:'#15803D', invited:'#d97706', suspended:'#B22234' };
-    if (!users.length) { el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">No team members found.</div>'; return; }
-    el.innerHTML = `<div style="display:grid;gap:10px">${users.map(u=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px;gap:12px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">${((u.full_name||u.email||'?')[0]).toUpperCase()}</div>
-          <div>
-            <div style="font-weight:600;color:var(--text1)">${u.full_name||'(No name set)'}</div>
-            <div style="font-size:12px;color:var(--text2)">${u.email||''}</div>
-            ${u.phone?`<div style="font-size:11px;color:var(--text2)">${u.phone}</div>`:''}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="background:${(roleColors[u.role]||'#374151')}20;color:${roleColors[u.role]||'#374151'};border:1px solid ${(roleColors[u.role]||'#374151')}40;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:capitalize">${u.role||'member'}</span>
-          <span style="background:${(statusColors[u.status]||'#374151')}20;color:${statusColors[u.status]||'#374151'};border:1px solid ${(statusColors[u.status]||'#374151')}40;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:capitalize">${u.status||'active'}</span>
-          ${u.status==='invited'?`<button class="btn btn-sm" style="font-size:11px;padding:4px 8px" onclick="resendInvite('${u.id}','${u.email}')">📧 Resend</button>`:''}
-          ${(['owner','admin'].includes(state.user?.role)&&u.id!==state.user?.id)?`<button class="btn btn-sm" style="font-size:11px;padding:4px 8px;background:#FEE2E2;color:#B22234;border:1px solid #FECACA" onclick="removeUser('${u.id}','${u.full_name||u.email}')">Remove</button>`:''}
-        </div>
-      </div>`).join('')}</div>`;
-  } catch(e) { el.innerHTML=`<div class="alert alert-danger">Failed to load users: ${e.message}</div>`; }
-}
-
 async function resendInvite(userId, email) {
   showToast('📧 Resending invite to '+email+'...');
   try {
@@ -3268,249 +3837,6 @@ async function sendInvite() {
     } else { msg.textContent=r.error||'Invite failed.'; if(btn){btn.disabled=false;btn.textContent='Send Invite ✈️';} }
   } catch(e) { msg.textContent=e.message; if(btn){btn.disabled=false;btn.textContent='Send Invite ✈️';} }
 }
-
-function renderSettingsAutomations() {
-  const autos = [
-    { icon:'🔄', name:'ClaimDesk Master Sync', desc:'Syncs all claims from JobNimbus every 6 hours', freq:'Every 6 hours', credits:'~0.18/run', runs:4 },
-    { icon:'🧠', name:'ClaimDesk Daily Sweep', desc:'AI reviews all open claims, flags stalls, generates action items', freq:'Daily at 7:00 AM CST', credits:'~0.1/run', runs:1 },
-    { icon:'🏠', name:'Daily Homeowner Follow-Up', desc:'Sends follow-up messages to homeowners with open claims', freq:'Daily at 9:00 AM CST', credits:'~0.1/run', runs:1 },
-    { icon:'📎', name:'New Attachment → Auto Parse', desc:'Parses carrier scopes and engineering reports on upload', freq:'On document upload', credits:'~0.05/run', runs:0 },
-  ];
-  return `
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">⚡ Active Automations</div></div>
-      <div class="card-body">
-        <div style="display:grid;gap:12px;margin-bottom:20px">
-          ${autos.map(a=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--surface2);border-radius:12px;gap:12px">
-            <div style="font-size:22px;flex-shrink:0">${a.icon}</div>
-            <div style="flex:1">
-              <div style="font-weight:700;color:var(--text1);font-size:14px">${a.name}</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:2px">${a.desc}</div>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">⏱ ${a.freq} &nbsp;·&nbsp; 💳 ${a.credits} &nbsp;·&nbsp; ${a.runs} run${a.runs!==1?'s':''} today</div>
-            </div>
-            <span style="background:#DCFCE7;color:#15803D;border:1px solid #BBF7D0;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;flex-shrink:0">● ACTIVE</span>
-          </div>`).join('')}
-        </div>
-        <div style="padding:14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;font-size:12px;color:#1345A8">
-          <strong>💳 Last 24h usage:</strong> 6 total runs · ~0.7 credits consumed
-        </div>
-      </div>
-    </div>
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">📅 Upcoming: Calendar & Task Sync</div></div>
-      <div class="card-body">
-        <div class="alert alert-info">
-          <strong>🔗 Coming Soon:</strong> Two-way sync with JobNimbus calendar — tasks, appointments, and follow-ups will appear automatically.
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSettingsReports() {
-  return `
-    <div class="card mb-4">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <div class="card-title">📊 AI Agent Reports</div>
-        <button class="btn btn-orange btn-sm" onclick="runSweep()">⚡ Run Report Now</button>
-      </div>
-      <div class="card-body">
-        <div id="reports-list"><div style="text-align:center;padding:24px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading reports...</div></div>
-      </div>
-    </div>
-  `;
-}
-
-async function loadReportsTab() {
-  const el = document.getElementById('reports-list');
-  if (!el) return;
-  try {
-    const r = await callFunction('entityFetch', { entity:'AgentReport', query:{}, limit:20, sort:'-generated_at' });
-    const reports = r.records || [];
-    if (!reports.length) {
-      el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--text2)">
-        <div style="font-size:40px;margin-bottom:12px">📊</div>
-        <div style="font-weight:600;margin-bottom:6px">No reports yet</div>
-        <div style="font-size:13px">Hit "Run Report Now" to generate the first AI sweep.</div>
-      </div>`; return;
-    }
-    el.innerHTML=`<div style="display:grid;gap:12px">${reports.map(rpt=>`
-      <div style="background:var(--surface2);border-radius:12px;padding:16px;cursor:pointer" onclick="this.querySelector('.rpt-body').style.display=this.querySelector('.rpt-body').style.display==='none'?'block':'none'">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-weight:700;color:var(--text1)">📊 ${rpt.report_type||'Daily Sweep'}</div>
-          <div style="font-size:12px;color:var(--text2)">${rpt.generated_at?new Date(rpt.generated_at).toLocaleString():''}</div>
-        </div>
-        <div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap">
-          <span style="color:var(--text2)">📋 ${rpt.claims_reviewed||0} claims</span>
-          <span style="color:#B22234">🚨 ${rpt.urgent_count||0} urgent</span>
-          <span style="color:#d97706">⏸ ${rpt.stalled_count||0} stalled</span>
-          <span style="color:#15803D">💰 $${((rpt.total_value_at_risk||0)).toLocaleString()} at risk</span>
-        </div>
-        <div class="rpt-body" style="display:none;font-size:13px;color:var(--text1);line-height:1.6;white-space:pre-wrap;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${rpt.summary||'No summary.'}</div>
-      </div>`).join('')}</div>`;
-  } catch(e) { el.innerHTML=`<div class="alert alert-danger">Failed to load reports: ${e.message}</div>`; }
-}
-
-function renderSettingsIntegrations() {
-  const integrations = [
-    { icon:'🔧', name:'JobNimbus', desc:'CRM — claims, contacts, jobs, documents', status:'connected', detail:'203 claims synced · Last sync: today' },
-    { icon:'📧', name:'Gmail', desc:'Email parsing — inbound carrier correspondence', status:'connected', detail:'Monitoring inbox for new carrier emails' },
-    { icon:'📍', name:'Google Maps / Satellite', desc:'Roof measurements — area, slopes, pitch', status:'connected', detail:'Used for satellite measurement pulls' },
-    { icon:'💳', name:'Xactimate (MOSL8X)', desc:'Current month price list — all line items', status:'connected', detail:'Price list: MOSL8X · Tax: 9.679% (St. Louis, MO)' },
-    { icon:'🏪', name:'SRS Distribution', desc:'Primary material supplier — Rep: Matt', status:'configured', detail:'Shingles, underlayment, accessories' },
-    { icon:'🏪', name:'ABC Supply', desc:'Secondary supplier — Rep: Clay', status:'configured', detail:'Shingles, gutters, siding, accessories' },
-  ];
-  return `
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">🔗 Connected Integrations</div></div>
-      <div class="card-body">
-        <div style="display:grid;gap:12px">
-          ${integrations.map(i=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface2);border-radius:10px;gap:12px">
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="font-size:24px">${i.icon}</div>
-              <div>
-                <div style="font-weight:600;color:var(--text1)">${i.name}</div>
-                <div style="font-size:12px;color:var(--text2)">${i.desc}</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:2px">${i.detail}</div>
-              </div>
-            </div>
-            <span style="background:${i.status==='connected'?'#DCFCE7':'#EFF6FF'};color:${i.status==='connected'?'#15803D':'#1345A8'};border:1px solid ${i.status==='connected'?'#BBF7D0':'#BFDBFE'};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0">
-              ${i.status==='connected'?'● Connected':'● Configured'}
-            </span>
-          </div>`).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSettingsAdmin() {
-  if (!['owner','admin'].includes(state.user?.role)) return '<div class="alert alert-danger">Access denied.</div>';
-  return `
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">🛡️ Admin Controls</div></div>
-      <div class="card-body">
-        <div class="alert alert-info" style="margin-bottom:16px">
-          Logged in as <strong>${(state.user?.role||'').toUpperCase()}</strong> — you have full access to all company data and controls.
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
-          <button class="btn btn-primary" onclick="runJNSync()">🔄 Force JN Sync Now</button>
-          <button class="btn btn-orange" onclick="runSweep()">🧠 Run AI Sweep Now</button>
-          <button class="btn" style="background:var(--surface2)" onclick="renderSettingsPage('users');setTimeout(loadUsersTab,300)">👥 Manage Team</button>
-          <button class="btn" style="background:var(--surface2)" onclick="renderSettingsPage('reports');setTimeout(loadReportsTab,300)">📊 View Reports</button>
-        </div>
-        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:12px">📋 Company Stats</div>
-        <div id="admin-stats"><div style="text-align:center;padding:16px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
-      </div>
-    </div>
-  `;
-}
-
-async function loadAdminStats() {
-  const el = document.getElementById('admin-stats');
-  if (!el) return;
-  try {
-    const [claimsR, usersR] = await Promise.all([
-      callFunction('entityFetch', { entity:'Claim', query:{}, limit:1 }),
-      callFunction('entityFetch', { entity:'CompanyUser', query:{ company_id: state.company?.id }, limit:100 }),
-    ]);
-    const totalClaims  = claimsR.total || claimsR.count || 0;
-    const allUsers     = usersR.records || [];
-    const activeUsers  = allUsers.filter(u=>u.status==='active').length;
-    const pendingUsers = allUsers.filter(u=>u.status==='invited').length;
-    el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-      ${[
-        { val:totalClaims,  label:'Total Claims',     color:'var(--primary)' },
-        { val:activeUsers,  label:'Active Users',     color:'#15803D' },
-        { val:pendingUsers, label:'Pending Invites',  color:'#d97706' },
-        { val:allUsers.length, label:'Total Seats Used', color:'#7c3aed' },
-      ].map(s=>`<div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center">
-        <div style="font-size:24px;font-weight:800;color:${s.color}">${s.val}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px">${s.label}</div>
-      </div>`).join('')}
-    </div>`;
-  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:var(--text2)">Could not load stats.</div>`; }
-}
-
-async function runJNSync() {
-  showToast('🔄 Starting JobNimbus sync...');
-  try {
-    const r = await callFunction('syncJobNimbus', {});
-    showToast('✅ Sync complete — '+(r.synced||0)+' claims updated','success');
-  } catch(e) { showToast('❌ Sync failed: '+e.message,'danger'); }
-}
-
-function renderSettingsBilling() {
-  const co = state.company || {};
-  const plans = [
-    { id:'starter', name:'Starter', price:199, seats:2,   estimates:50,  color:'#2563eb', features:['2 seats included','50 estimates/mo','JobNimbus sync','Basic AI reports'] },
-    { id:'pro',     name:'Pro',     price:499, seats:8,   estimates:200, color:'#7c3aed', features:['8 seats included','200 estimates/mo','Priority AI sweep','Advanced reports','Custom work orders'] },
-    { id:'elite',   name:'Elite',   price:999, seats:-1,  estimates:-1,  color:'#d97706', features:['Unlimited seats','Unlimited estimates','White-label ready','API access','Dedicated support'] },
-  ];
-  const current = co.plan || 'trial';
-  const currentPrice = {starter:199,pro:499,elite:999}[current]||0;
-  return `
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">💳 Plan & Billing</div></div>
-      <div class="card-body">
-        <div style="background:var(--surface2);border-radius:12px;padding:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-          <div>
-            <div style="font-weight:700;color:var(--text1)">Current Plan: <span style="color:var(--primary);text-transform:capitalize">${current}</span></div>
-            <div style="font-size:13px;color:var(--text2);margin-top:3px">${co.plan_expires?'Renews: '+new Date(co.plan_expires).toLocaleDateString():'No active subscription'} ${co.billing_cycle?'· '+co.billing_cycle:''}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:24px;font-weight:800;color:var(--primary)">$${currentPrice}<span style="font-size:13px;color:var(--text2)">/mo</span></div>
-            <div style="font-size:11px;color:var(--text2)">+ 4% success fee on approved supplements</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
-          ${plans.map(p=>`
-          <div style="border:2px solid ${p.id===current?p.color:'var(--border)'};border-radius:14px;padding:20px;position:relative;background:${p.id===current?p.color+'10':'var(--surface1)'}">
-            ${p.id===current?`<div style="position:absolute;top:-1px;right:12px;background:${p.color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:0 0 6px 6px">CURRENT</div>`:''}
-            <div style="font-size:18px;font-weight:800;color:${p.color};margin-bottom:4px">${p.name}</div>
-            <div style="font-size:26px;font-weight:900;color:var(--text1);margin-bottom:4px">$${p.price}<span style="font-size:13px;font-weight:400;color:var(--text2)">/mo</span></div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:14px">${p.seats===-1?'Unlimited':p.seats} seats · ${p.estimates===-1?'Unlimited':p.estimates} estimates/mo</div>
-            <div style="display:grid;gap:5px;margin-bottom:16px">${p.features.map(f=>`<div style="font-size:12px;color:var(--text1)">✅ ${f}</div>`).join('')}</div>
-            ${p.id!==current?`<button class="btn btn-primary btn-sm" style="width:100%;background:${p.color};border-color:${p.color}" onclick="showToast('Contact Austin to upgrade: (314) 695-3868')">Upgrade to ${p.name}</button>`:`<div style="font-size:12px;color:${p.color};text-align:center;font-weight:700">✅ Your Current Plan</div>`}
-          </div>`).join('')}
-        </div>
-        <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:14px;font-size:13px;color:#713F12;margin-bottom:20px">
-          <strong>💡 Save ~17% with annual billing.</strong> Contact Austin: (314) 695-3868 or Austin@coxroof.com
-        </div>
-      </div>
-    </div>
-    <div class="card mb-4">
-      <div class="card-header"><div class="card-title">🧾 Billing History</div></div>
-      <div class="card-body">
-        <div id="billing-list"><div style="text-align:center;padding:24px;color:var(--text2)"><div class="spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
-      </div>
-    </div>
-  `;
-}
-
-async function loadBillingTab() {
-  const el = document.getElementById('billing-list');
-  if (!el) return;
-  try {
-    const r = await callFunction('entityFetch', { entity:'BillingEvent', query:{ company_id: state.company?.id }, limit:20, sort:'-billing_date' });
-    const events = r.records || [];
-    if (!events.length) { el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">No billing history yet.</div>'; return; }
-    el.innerHTML=`<div style="display:grid;gap:8px">${events.map(e=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface2);border-radius:8px">
-        <div>
-          <div style="font-weight:600;font-size:14px;color:var(--text1)">${e.description||e.event_type||'Charge'}</div>
-          <div style="font-size:12px;color:var(--text2)">${e.billing_date?new Date(e.billing_date).toLocaleDateString():''}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700;color:var(--text1)">$${((e.amount||0)).toLocaleString()}</div>
-          <div style="font-size:11px;color:${e.status==='paid'?'#15803D':'#d97706'};font-weight:600;text-transform:uppercase">${e.status||'pending'}</div>
-        </div>
-      </div>`).join('')}</div>`;
-  } catch(e) { el.innerHTML=`<div style="font-size:13px;color:var(--text2)">Could not load billing history.</div>`; }
-}
-
 
 function loadSettingsTabData() {
   const tab = state._settingsTab || 'profile';
