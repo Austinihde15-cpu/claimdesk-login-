@@ -4460,6 +4460,7 @@ function openDocBuilderForJob(claimId) {
 </script>
 <script>
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT BUILDER v3 — Complete Rewrite  June 2026
 //  Cox Roofing & Restoration | MOSL8X | STL 2026 Pricing
@@ -4832,7 +4833,7 @@ function renderDocBuilderPage(preloadJobId) {
   .dbt{display:flex;gap:4px;padding:5px;background:var(--surface2);border-radius:12px;margin-bottom:20px;width:fit-content;border:1px solid var(--border);flex-wrap:wrap}
   .dbt-t{padding:8px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--text2);transition:all .15s;white-space:nowrap}
   .dbt-t.active{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(30,111,255,.3)}
-  .db-job-banner{background:linear-gradient(135deg,#1345A8,#1e6fff);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .db-job-banner{background:linear-gradient(135deg,#0f3a8a,#1e6fff);color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 4px 20px rgba(30,111,255,.30),0 1px 4px rgba(0,0,0,.18);border:1.5px solid rgba(255,255,255,.12)}
   .db-job-banner .jb-name{font-size:16px;font-weight:800}
   .db-job-banner .jb-addr{font-size:12px;opacity:.85}
   .db-job-banner .jb-badge{background:rgba(255,255,255,.18);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700}
@@ -4884,8 +4885,6 @@ function renderDBInner() {
   const el = document.getElementById('db-inner');
   if (!el) return;
 
-  const today = new Date().toISOString().slice(0, 10);
-
   // ── TOP BAR ──────────────────────────────────────────────────────────────
   let html = `
   <div class="db-topbar">
@@ -4893,70 +4892,107 @@ function renderDBInner() {
       <div style="font-size:20px;font-weight:800;color:var(--text1)">&#x1F4DD; Document Builder</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">Estimate &middot; Material Order &middot; Work Order</div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-      ${DS.job ? `<button class="btn btn-ghost btn-sm" onclick="window._dbState.job=null;renderDBInner()">&#x1F504; Change Job</button>` : ''}
-    </div>
   </div>`;
 
   // ── JOB SELECTION OR BANNER ───────────────────────────────────────────────
-  if (!DS.job) {
+  if (!DS.job && !DS.blankMode) {
+    // ── Selection card ────────────────────────────────────────────────────
     html += `
     <div class="db-select-card" id="db-job-select-card">
       <div style="font-size:40px;margin-bottom:10px">&#x1F3E0;</div>
       <h3>Select a Job to Get Started</h3>
-      <p>Choose an existing job from JobNimbus to auto-populate fields.<br>Only jobs without a complete document set are shown.</p>
-      <div style="display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <p>Choose from JobNimbus. Only jobs missing <em>this specific doc type</em> are shown —<br>
+         so a job with an Estimate still appears when making a Material Order.</p>
+      <div style="display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:14px">
         <select class="jb-sel" id="db-job-dropdown" onchange="dbSelectJob(this.value)">
           <option value="">&#x23F3; Loading jobs...</option>
         </select>
-        <button class="btn btn-ghost btn-sm" onclick="dbLoadJobs()">&#x21BB; Refresh</button>
+        <button class="btn btn-ghost btn-sm" onclick="dbLoadJobs()" title="Reload job list">&#x21BB;</button>
       </div>
-      <div id="db-job-status" style="font-size:12px;color:var(--text2)"></div>
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Or create a new manual document:</div>
+      <div id="db-job-status" style="font-size:12px;color:var(--text2);margin-bottom:14px"></div>
+      <div style="padding-top:14px;border-top:1px solid var(--border)">
         <button class="btn btn-ghost btn-sm" onclick="dbUseBlankJob()">&#x2795; New Blank Document</button>
       </div>
     </div>`;
+
+  } else if (DS.blankMode) {
+    // ── Blank mode banner ────────────────────────────────────────────────
+    html += `
+    <div class="db-job-banner" style="background:var(--surface2);border:2px solid var(--border);color:var(--text1)">
+      <div style="font-size:26px">&#x1F4C4;</div>
+      <div style="flex:1">
+        <div class="jb-name" style="color:var(--text1)">Blank Document</div>
+        <div class="jb-addr" style="color:var(--text2);opacity:1">Fill in job info manually below</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="window._dbState.blankMode=false;window._dbState.job=null;renderDBInner()" style="white-space:nowrap">
+        &#x1F4CB; Select a Job Instead
+      </button>
+    </div>`;
+
   } else {
+    // ── Job selected banner ───────────────────────────────────────────────
     const j = DS.job;
-    const docList = (DS.job._docs || []).join(' &middot; ') || 'No prior documents';
+    const fullAddr = [j.address, j.city, j.state, j.zip].filter(Boolean).join(', ');
+    const carrier  = j.carrier || '';
+    const status   = j.status  || '';
+    const jnNum    = j.job_number ? 'JN #' + j.job_number : '';
+
     html += `
     <div class="db-job-banner">
-      <div style="font-size:28px">&#x1F3E0;</div>
+      <div style="font-size:30px;line-height:1">&#x1F3E0;</div>
       <div style="flex:1;min-width:0">
-        <div class="jb-name">${j.insured_name || j.name || 'Unknown Homeowner'}</div>
-        <div class="jb-addr">${j.address || ''}${j.city ? ', '+j.city : ''}${j.state ? ' '+j.state : ''}${j.zip ? ' '+j.zip : ''}</div>
-        <div style="margin-top:4px;font-size:11px;opacity:.75">${docList}</div>
+        <div class="jb-name">${j.insured_name || 'Unknown Homeowner'}</div>
+        <div class="jb-addr">${fullAddr || '—'}</div>
+        ${carrier || status ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          ${jnNum    ? `<span class="jb-badge">${jnNum}</span>` : ''}
+          ${carrier  ? `<span class="jb-badge">&#x1F6E1; ${carrier}</span>` : ''}
+          ${status   ? `<span class="jb-badge">&#x25CF; ${status}</span>` : ''}
+        </div>` : ''}
       </div>
-      ${j.job_number ? `<div class="jb-badge">JN #${j.job_number}</div>` : ''}
-      ${j.carrier ? `<div class="jb-badge">${j.carrier}</div>` : ''}
-      ${j.status ? `<div class="jb-badge">${j.status}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.35);font-weight:700;white-space:nowrap"
+          onclick="window._dbState.job=null;window._dbState.blankMode=false;renderDBInner()">
+          &#x1F504; Change Job
+        </button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,.10);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.2);font-size:11px;white-space:nowrap"
+          onclick="dbUseBlankJob()">
+          &#x2795; New Blank Instead
+        </button>
+      </div>
     </div>`;
   }
 
-  // ── TAB BAR (shown when job is selected OR blank mode) ───────────────────
+  // ── TAB BAR ──────────────────────────────────────────────────────────────
   if (DS.job || DS.blankMode) {
     html += `
     <div class="dbt">
-      <button class="dbt-t ${DS.tab==='estimate'?'active':''}" onclick="window._dbState.tab='estimate';renderDBInner()">&#x1F4CB; Estimate</button>
-      <button class="dbt-t ${DS.tab==='matorder'?'active':''}" onclick="window._dbState.tab='matorder';renderDBInner()">&#x1F9F1; Material Order</button>
-      <button class="dbt-t ${DS.tab==='workorder'?'active':''}" onclick="window._dbState.tab='workorder';renderDBInner()">&#x1F528; Work Order</button>
+      <button class="dbt-t ${DS.tab==='estimate' ?'active':''}" onclick="dbSwitchTab('estimate')">&#x1F4CB; Estimate</button>
+      <button class="dbt-t ${DS.tab==='matorder' ?'active':''}" onclick="dbSwitchTab('matorder')">&#x1F9F1; Material Order</button>
+      <button class="dbt-t ${DS.tab==='workorder'?'active':''}" onclick="dbSwitchTab('workorder')">&#x1F528; Work Order</button>
     </div>`;
 
-    if (DS.tab === 'estimate') html += buildEstimateTab();
-    else if (DS.tab === 'matorder') html += buildMaterialOrderTab();
+    if      (DS.tab === 'estimate' ) html += buildEstimateTab();
+    else if (DS.tab === 'matorder' ) html += buildMaterialOrderTab();
     else if (DS.tab === 'workorder') html += buildWorkOrderTab();
   }
 
   el.innerHTML = html;
 
-  // ── Post-render setup ─────────────────────────────────────────────────────
-  if (!DS.job && !DS.blankMode) {
+  // ── Post-render ───────────────────────────────────────────────────────────
+  if (!DS.job && !DS.blankMode) dbLoadJobs();
+  if (DS.tab === 'estimate' ) recalcEst();
+  if (DS.tab === 'workorder') recalcWO();
+  if (DS.tab === 'matorder' ) recalcMO();
+}
+
+// Tab switch: re-filter dropdown for the new tab's doc type
+function dbSwitchTab(tab) {
+  window._dbState.tab = tab;
+  renderDBInner();
+  // If we're back at job selection, re-run the filter for the new tab
+  if (!window._dbState.job && !window._dbState.blankMode) {
     dbLoadJobs();
   }
-  if (DS.tab === 'estimate') { recalcEst(); }
-  if (DS.tab === 'workorder') { recalcWO(); }
-  if (DS.tab === 'matorder') { recalcMO(); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4970,53 +5006,66 @@ async function dbLoadJobs() {
   sel.innerHTML = '<option value="">⏳ Loading jobs…</option>';
   if (status) status.innerHTML = '';
 
+  // Which doc type are we currently on?
+  const DS      = window._dbState || {};
+  const curTab  = DS.tab || 'estimate';
+  const TAB_TYPE = { estimate:'estimate', matorder:'material_order', workorder:'work_order' };
+  const curType  = TAB_TYPE[curTab] || 'estimate';
+
   try {
-    // ── Parallel fetch: all claims + all doc-type attachments ──────────────
+    // ── Parallel fetch: all claims + all doc-type attachments ─────────────
     const [claimRes, attRes] = await Promise.all([
       callFunction('entityFetch', { entity: 'Claim',      action: 'list', limit: 500 }),
       callFunction('entityFetch', { entity: 'Attachment', action: 'list', limit: 500 })
     ]);
 
-    const allClaims = (claimRes.records  || []).filter(c => c && (c.insured_name || c.address));
-    const allAtts   = (attRes.records    || []);
+    const allClaims = (claimRes.records || []).filter(c => c && (c.insured_name || c.address));
+    const allAtts   = (attRes.records   || []);
 
-    // ── Build set of claim_ids that already have an Estimate, MO, or WO ───
-    const DOC_TYPES = new Set(['estimate', 'material_order', 'work_order']);
-    const claimsWithDocs = new Set();
+    // ── Per-tab: build set of claim_ids that already have THIS doc type ───
+    // e.g. on Estimate tab → hide only jobs with an existing estimate
+    // on WO tab → hide only jobs with an existing work_order
+    // This lets you still create a MO for a job that already has an Estimate
+    const claimsWithThisDoc = new Set();
     allAtts.forEach(a => {
       const dt = (a.document_type || '').toLowerCase().trim();
-      if (DOC_TYPES.has(dt) && a.claim_id) claimsWithDocs.add(a.claim_id);
+      if (dt === curType && a.claim_id) claimsWithThisDoc.add(a.claim_id);
     });
 
-    // ── Filter to only eligible jobs ───────────────────────────────────────
-    const eligible = allClaims.filter(c => !claimsWithDocs.has(c.id));
+    // Store all attachments for tab-switch re-filtering
+    window._dbAllAtts = allAtts;
+    window._dbAllClaims = allClaims;
 
-    // ── Alphabetical by address, then name ────────────────────────────────
+    // ── Filter eligible for this tab ──────────────────────────────────────
+    const eligible = allClaims.filter(c => !claimsWithThisDoc.has(c.id));
+
+    // ── Alphabetical by address → name ───────────────────────────────────
     eligible.sort((a, b) => {
       const ka = (a.address || a.insured_name || '').toLowerCase();
       const kb = (b.address || b.insured_name || '').toLowerCase();
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
 
+    const docLabel = { estimate:'Estimate', matorder:'Material Order', workorder:'Work Order' }[curTab] || 'document';
+
     if (!eligible.length) {
-      sel.innerHTML = '<option value="">No eligible jobs found</option>';
+      sel.innerHTML = `<option value="">No eligible jobs for ${docLabel}</option>`;
       if (status) status.innerHTML =
-        '<span style="color:var(--orange)">&#x26A0; All jobs already have documents. ' +
-        '<a href="#" onclick="dbUseBlankJob();return false" style="color:var(--primary)">Create a blank document instead.</a></span>';
+        `<span style="color:var(--orange)">&#x26A0; All jobs already have a ${docLabel}. ` +
+        `<a href="#" onclick="dbUseBlankJob();return false" style="color:var(--primary)">Create a blank document instead.</a></span>`;
       return;
     }
 
-    // ── Build options: "Address — Name (JN#XXXX)" ─────────────────────────
+    // ── Build options: "Address, City — Name (#JN)" ───────────────────────
     const opts = ['<option value="">— Select a Job —</option>'];
     eligible.forEach(c => {
-      const addr  = c.address ? c.address.replace(/,\s*/, ', ') : '';
-      const name  = c.insured_name || '';
-      const jn    = c.job_number   ? '#' + c.job_number : '';
-      const city  = c.city         ? ', ' + c.city      : '';
-      // Format: "Address, City — Name (JN#)"
-      let label = addr ? addr + city : name;
-      if (addr && name)  label += ' — ' + name;
-      if (jn)            label += ' (' + jn + ')';
+      const addr = c.address ? c.address.trim() : '';
+      const city = c.city    ? ', ' + c.city    : '';
+      const name = c.insured_name ? c.insured_name.trim() : '';
+      const jn   = c.job_number  ? ' (#' + c.job_number + ')' : '';
+      let label  = addr ? addr + city : name;
+      if (addr && name) label += ' — ' + name;
+      label += jn;
       opts.push(`<option value="${c.id}">${label}</option>`);
     });
     sel.innerHTML = opts.join('');
@@ -5024,28 +5073,27 @@ async function dbLoadJobs() {
     const already = allClaims.length - eligible.length;
     if (status) {
       status.innerHTML =
-        `<span style="color:var(--green)">&#x2714; ${eligible.length} eligible job${eligible.length===1?'':'s'}</span>` +
-        (already > 0 ? ` <span style="color:var(--text2)">&nbsp;&middot;&nbsp;${already} already have documents (hidden)</span>` : '');
+        `<span style="color:var(--green)">&#x2714; ${eligible.length} eligible</span>` +
+        (already > 0
+          ? ` <span style="color:var(--text2);font-size:11px">&nbsp;&middot;&nbsp;${already} already have a ${docLabel} (hidden)</span>`
+          : '');
     }
 
-    // ── Auto-select if a preload ID was requested ─────────────────────────
-    const preId = window._dbState && window._dbState.preloadJobId;
+    // ── Auto-select preloaded job (in-job flow) ───────────────────────────
+    const preId = DS.preloadJobId;
     if (preId) {
-      // Allow preloading even if job already has docs (in-job context)
-      const allOpts = allClaims;
-      const match = allOpts.find(c => c.id === preId);
+      const match = allClaims.find(c => c.id === preId);
       if (match) {
-        // Add it if not already in dropdown
         if (!eligible.find(c => c.id === preId)) {
-          const addr  = match.address    ? match.address + (match.city ? ', '+match.city : '') : '';
-          const name  = match.insured_name || '';
-          const jn    = match.job_number  ? '#'+match.job_number : '';
-          let label = addr || name;
+          // Job already has this doc type — add it as "[Current Job]" anyway
+          const addr = match.address ? match.address + (match.city ? ', '+match.city:'') : '';
+          const name = match.insured_name || '';
+          const jn   = match.job_number  ? ' (#'+match.job_number+')' : '';
+          let label  = addr || name;
           if (addr && name) label += ' — ' + name;
-          if (jn) label += ' (' + jn + ')';
+          label += jn + ' [Current Job]';
           const opt = document.createElement('option');
-          opt.value = preId;
-          opt.textContent = label + ' [Current Job]';
+          opt.value = preId; opt.textContent = label;
           sel.insertBefore(opt, sel.children[1]);
         }
         sel.value = preId;
@@ -5885,6 +5933,7 @@ function copyEstimateText(asMO) {
   }
   navigator.clipboard.writeText(text).then(() => showToast('\u2705 Copied to clipboard!', 'success'));
 }
+
 
 
 
