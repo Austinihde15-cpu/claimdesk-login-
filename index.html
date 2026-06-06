@@ -5286,118 +5286,241 @@ let pcState = {
 function renderPhotoChecklistPage() {
   document.getElementById('content').innerHTML = `
   <style>
-    .pc-hero { background:linear-gradient(135deg,#0f1c2e 0%,#1e3050 100%);
-      border:1px solid var(--border);border-radius:12px;padding:22px 26px;margin-bottom:22px;
-      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px; }
-    .pc-hero-title { font-size:20px;font-weight:800;margin-bottom:4px; }
-    .pc-hero-sub { font-size:13px;color:var(--text2); }
-    .pc-job-bar { background:var(--card);border:1px solid var(--border);border-radius:10px;
-      padding:16px 20px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px; }
+    /* ── Global checklist container ── */
+    .checklist-container { background:#f8fafc; padding:2rem; }
+
+    /* ── Section cards ── */
+    .section-card {
+      background:#ffffff; border:1px solid #e2e8f0; border-radius:12px;
+      padding:1.75rem; margin-bottom:1.5rem;
+      box-shadow:0 4px 6px -1px rgba(0,0,0,.07),0 2px 4px -2px rgba(0,0,0,.05);
+    }
+
+    /* ── Bold crisp typography ── */
+    .pc-hero-title, .pc-section-title, .pc-stat-label,
+    .pc-item-label, .type-btn, label, .form-label {
+      font-weight:700 !important; letter-spacing:-0.02em;
+    }
+    .text-muted { color:#475569; }
+
+    /* ── Dark hero banner ── */
+    .pc-hero {
+      background:#0f172a; color:#fff;
+      border-radius:16px; padding:28px 32px; margin-bottom:24px;
+      display:flex; align-items:flex-start; justify-content:space-between;
+      flex-wrap:wrap; gap:16px;
+      box-shadow:0 8px 24px rgba(0,0,0,.25);
+    }
+    .pc-hero-title {
+      font-size:22px; font-weight:800; letter-spacing:-0.03em; margin-bottom:6px;
+    }
+    .pc-hero-sub { font-size:14px; color:#94a3b8; line-height:1.5; }
+
+    /* ── Job info grid ── */
+    .pc-job-bar {
+      display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px;
+      background:#ffffff; border:1px solid #e2e8f0; border-radius:12px;
+      padding:20px 24px; margin-bottom:24px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+    }
     @media(max-width:700px){.pc-job-bar{grid-template-columns:1fr 1fr;}}
-    .pc-section { margin-bottom:28px; }
-    .pc-section-hdr { display:flex;align-items:center;gap:10px;padding:12px 16px;
-      border-radius:10px 10px 0 0;margin-bottom:0; }
-    .pc-section-title { font-size:14px;font-weight:800;color:#fff; }
-    .pc-section-count { font-size:11px;font-weight:700;background:rgba(255,255,255,.15);
-      padding:2px 9px;border-radius:12px;color:#fff; }
-    .pc-items { border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden; }
-    .pc-item { display:grid;grid-template-columns:36px 1fr 160px 140px;gap:12px;
-      padding:14px 16px;border-bottom:1px solid var(--border);align-items:center;
-      transition:background .1s; }
-    .pc-item:last-child{border-bottom:none;}
-    .pc-item:hover{background:rgba(255,255,255,.02);}
-    @media(max-width:800px){.pc-item{grid-template-columns:36px 1fr;gap:8px;}}
-    .pc-status-dot { width:18px;height:18px;border-radius:50%;border:2px solid var(--border);
-      display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;
-      flex-shrink:0;transition:all .2s; }
-    .pc-status-dot.done { background:var(--green);border-color:var(--green);color:#fff; }
-    .pc-status-dot.skipped { background:#4b5563;border-color:#4b5563;color:#fff; }
-    .pc-item-label { font-size:13px;font-weight:600; }
-    .pc-item-desc { font-size:11.5px;color:var(--text2);margin-top:2px; }
-    .pc-item-tip { font-size:11px;color:#fbbf24;margin-top:3px;font-style:italic; }
-    .pc-required-badge { display:inline-flex;padding:1px 7px;border-radius:10px;
-      font-size:10px;font-weight:700;background:#450a0a;color:#fca5a5;margin-left:6px; }
-    .photo-thumb-area { display:flex;align-items:center;gap:8px; }
-    .photo-thumb { width:48px;height:48px;border-radius:6px;object-fit:cover;
-      border:2px solid var(--green);cursor:pointer; }
-    .photo-upload-btn { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;
-      border-radius:7px;border:1px dashed var(--border);background:transparent;
-      color:var(--text2);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap; }
-    .photo-upload-btn:hover { border-color:var(--blue);color:var(--blue);background:rgba(30,111,255,.06); }
-    .photo-note-input { width:100%;padding:5px 8px;background:var(--navy3);border:1px solid var(--border);
-      border-radius:6px;color:var(--text);font-size:11.5px;outline:none; }
-    .photo-note-input:focus{border-color:var(--blue);}
-    .pc-progress-bar-wrap { background:var(--navy3);border-radius:20px;height:8px;
-      overflow:hidden;margin:8px 0; }
-    .pc-progress-bar { height:100%;border-radius:20px;transition:width .4s;
-      background:linear-gradient(90deg,var(--blue),var(--green)); }
-    .pc-summary-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px; }
+
+    /* ── Summary stat cards ── */
+    .pc-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
     @media(max-width:700px){.pc-summary-grid{grid-template-columns:1fr 1fr;}}
-    .pc-stat { background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
-    .pc-stat-label { font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em; }
-    .pc-stat-val { font-size:24px;font-weight:800;margin-top:4px; }
-    .gap-warning { background:#3f2a00;border:1px solid #854d0e;border-radius:8px;
-      padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#fde68a; }
-    .pay-hold-banner { background:#450a0a;border:2px solid #dc2626;border-radius:10px;
-      padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px; }
-    .pay-hold-icon { font-size:28px;flex-shrink:0; }
-    .pay-hold-title { font-size:15px;font-weight:800;color:#fca5a5;margin-bottom:4px; }
-    .pay-hold-sub { font-size:12.5px;color:#fca5a5;opacity:.8; }
-    .type-selector { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px; }
-    .type-btn { display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:9px;
-      border:1px solid var(--border);background:var(--navy3);color:var(--text2);
-      cursor:pointer;font-size:13px;font-weight:600;transition:all .15s; }
-    .type-btn:hover{border-color:var(--blue);color:var(--text);}
-    .type-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
-    .submit-review-btn { background:linear-gradient(135deg,#1e6fff,#7c3aed);color:#fff;
-      border:none;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:800;
-      cursor:pointer;transition:all .2s;box-shadow:0 4px 14px rgba(30,111,255,.3); }
-    .submit-review-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(30,111,255,.4);}
-    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;
-      display:flex;align-items:center;justify-content:center; }
-    .photo-modal { background:var(--card);border:1px solid var(--border);border-radius:12px;
-      max-width:500px;width:95vw;max-height:85vh;overflow-y:auto; }
-    .photo-modal img { width:100%;border-radius:8px; }
+    .pc-stat {
+      background:linear-gradient(135deg,#f8fafc,#ffffff);
+      border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+    }
+    .pc-stat-label {
+      font-size:10px; font-weight:800; color:#64748b;
+      text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px;
+    }
+    .pc-stat-val { font-size:2.25rem; font-weight:800; color:#0f172a; line-height:1; }
+    .status-number { font-size:2.25rem; font-weight:800; color:#0f172a; }
+
+    /* ── Job type selector ── */
+    .type-selector { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
+    .type-btn {
+      display:flex; align-items:center; gap:8px; padding:10px 18px;
+      border-radius:10px; border:2px solid #e2e8f0;
+      background:#ffffff; color:#475569;
+      font-size:13px; font-weight:700; cursor:pointer;
+      transition:all .15s; letter-spacing:-.01em;
+    }
+    .type-btn:hover { border-color:#3b82f6; color:#1d4ed8; background:#eff6ff; }
+    .type-btn.active {
+      background:#2563eb; border-color:#2563eb; color:#fff;
+      box-shadow:0 4px 12px rgba(37,99,235,.3);
+    }
+
+    /* ── Checklist sections ── */
+    .pc-section { margin-bottom:28px; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .pc-section-hdr {
+      display:flex; align-items:center; gap:10px; padding:14px 18px;
+      border-radius:0;
+    }
+    .pc-section-title { font-size:14px; font-weight:800; color:#fff; letter-spacing:-.01em; }
+    .pc-section-count {
+      font-size:11px; font-weight:700; background:rgba(255,255,255,.18);
+      padding:3px 10px; border-radius:12px; color:#fff;
+    }
+    .pc-items {
+      border:1px solid #e2e8f0; border-top:none;
+      border-radius:0 0 12px 12px; overflow:hidden; background:#fff;
+    }
+    .pc-item {
+      display:grid; grid-template-columns:36px 1fr 160px 140px; gap:12px;
+      padding:14px 18px; border-bottom:1px solid #f1f5f9;
+      align-items:center; transition:background .1s;
+    }
+    .pc-item:last-child { border-bottom:none; }
+    .pc-item:hover { background:#f8fafc; }
+    @media(max-width:800px){.pc-item{grid-template-columns:36px 1fr;gap:8px;}}
+    .pc-status-dot {
+      width:20px; height:20px; border-radius:50%;
+      border:2px solid #cbd5e1;
+      display:flex; align-items:center; justify-content:center;
+      font-size:10px; cursor:pointer; flex-shrink:0; transition:all .2s;
+    }
+    .pc-status-dot.done { background:#16a34a; border-color:#16a34a; color:#fff; }
+    .pc-status-dot.skipped { background:#4b5563; border-color:#4b5563; color:#fff; }
+    .pc-item-label { font-size:13px; font-weight:700; color:#0f172a; }
+    .pc-item-desc { font-size:11.5px; color:#64748b; margin-top:2px; }
+    .pc-item-tip { font-size:11px; color:#d97706; margin-top:3px; font-style:italic; }
+    .pc-required-badge {
+      display:inline-flex; padding:2px 8px; border-radius:10px;
+      font-size:10px; font-weight:800;
+      background:#fee2e2; color:#dc2626; margin-left:6px; letter-spacing:.02em;
+    }
+
+    /* ── Photo upload ── */
+    .photo-thumb-area { display:flex; align-items:center; gap:8px; }
+    .photo-thumb {
+      width:48px; height:48px; border-radius:6px; object-fit:cover;
+      border:2px solid #16a34a; cursor:pointer;
+    }
+    .photo-upload-btn {
+      display:inline-flex; align-items:center; gap:5px; padding:6px 12px;
+      border-radius:7px; border:1.5px dashed #cbd5e1; background:transparent;
+      color:#64748b; font-size:11.5px; font-weight:700; cursor:pointer;
+      transition:all .15s; white-space:nowrap;
+    }
+    .photo-upload-btn:hover { border-color:#3b82f6; color:#2563eb; background:#eff6ff; }
+    .photo-note-input {
+      width:100%; padding:6px 10px; background:#f8fafc;
+      border:1.5px solid #e2e8f0; border-radius:6px;
+      color:#0f172a; font-size:11.5px; outline:none; transition:border .15s;
+    }
+    .photo-note-input:focus { border-color:#3b82f6; }
+
+    /* ── Progress bar ── */
+    .pc-progress-bar-wrap {
+      background:#e2e8f0; border-radius:20px; height:8px; overflow:hidden; margin:8px 0;
+    }
+    .pc-progress-bar {
+      height:100%; border-radius:20px; transition:width .4s;
+      background:linear-gradient(90deg,#3b82f6,#16a34a);
+    }
+
+    /* ── Pay Hold Banner (CRITICAL) ── */
+    .pay-hold-banner {
+      background:#7f1d1d; border:2px solid #dc2626; border-radius:16px;
+      padding:22px 24px; margin-bottom:22px;
+      display:flex; align-items:flex-start; gap:16px;
+      box-shadow:0 4px 20px rgba(220,38,38,.3);
+    }
+    .pay-hold-icon { font-size:36px; flex-shrink:0; margin-top:2px; }
+    .pay-hold-title {
+      font-size:18px; font-weight:800; color:#ffffff;
+      margin-bottom:4px; letter-spacing:-.02em;
+    }
+    .pay-hold-sub { font-size:13px; color:#fca5a5; line-height:1.5; }
+
+    /* ── Gap warning ── */
+    .gap-warning {
+      background:#fefce8; border:1px solid #ca8a04; border-radius:10px;
+      padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:#854d0e;
+    }
+
+    /* ── Role / banner strips ── */
+    .role-switcher-row {
+      display:flex; align-items:center; gap:10px;
+      margin-bottom:18px; flex-wrap:wrap;
+    }
+    .role-switcher-label {
+      font-size:11px; font-weight:800; color:#64748b;
+      text-transform:uppercase; letter-spacing:.08em; white-space:nowrap;
+    }
+    .role-switcher-group {
+      display:flex; gap:6px; background:#f1f5f9;
+      border:1px solid #e2e8f0; border-radius:10px; padding:4px;
+    }
+    .role-switcher-btn {
+      padding:8px 18px; border-radius:7px; border:none;
+      font-size:12px; font-weight:700; cursor:pointer; transition:all .15s;
+      background:transparent; color:#64748b;
+    }
+    .role-switcher-btn.active { background:#2563eb; color:#fff; box-shadow:0 2px 8px rgba(37,99,235,.25); }
+
+    /* ── Submit button ── */
+    .submit-review-btn {
+      background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff;
+      border:none; padding:14px 32px; border-radius:10px;
+      font-size:14px; font-weight:800; cursor:pointer;
+      transition:all .2s; box-shadow:0 4px 16px rgba(37,99,235,.35);
+      letter-spacing:-.01em;
+    }
+    .submit-review-btn:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(37,99,235,.45); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .photo-modal {
+      background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+      max-width:500px; width:95vw; max-height:85vh; overflow-y:auto;
+    }
+    .photo-modal img { width:100%; border-radius:8px; }
   </style>
 
+  <!-- ══ DARK HERO BANNER ══ -->
   <div class="pc-hero">
     <div>
       <div class="pc-hero-title">&#x1F4F8; Crew Photo Checklist</div>
       <div class="pc-hero-sub">Required photos must be uploaded before crew pay is released. Missing required photos = pay on hold.</div>
     </div>
-    <button class="btn btn-primary" onclick="exportPhotoReport()">&#x1F4C4; Export Report</button>
+    <button class="btn btn-primary" onclick="exportPhotoReport()" style="white-space:nowrap;font-weight:700;padding:10px 20px;border-radius:9px;">
+      &#x1F4C4; Export Report
+    </button>
   </div>
 
-  <!-- ROLE SWITCHER -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
-    <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Viewing As:</div>
-    <div style="display:flex;gap:8px;background:var(--navy3);border:1px solid var(--border);border-radius:10px;padding:4px;">
-      <button id="role-btn-all" onclick="setPCRole('all')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff;transition:all .15s;">
-        👁 All Phases
-      </button>
-      <button id="role-btn-salesman" onclick="setPCRole('salesman')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .15s;">
-        🤝 My Photos (Salesman)
-      </button>
-      <button id="role-btn-crew_lead" onclick="setPCRole('crew_lead')" style="padding:8px 18px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .15s;">
-        🔨 Crew Lead Photos
-      </button>
+  <!-- ══ ROLE SWITCHER ══ -->
+  <div class="role-switcher-row">
+    <div class="role-switcher-label">Viewing As:</div>
+    <div class="role-switcher-group">
+      <button id="role-btn-all" class="role-switcher-btn active" onclick="setPCRole('all')">👁 All Phases</button>
+      <button id="role-btn-salesman" class="role-switcher-btn" onclick="setPCRole('salesman')">🤝 Salesman</button>
+      <button id="role-btn-crew_lead" class="role-switcher-btn" onclick="setPCRole('crew_lead')">🔨 Crew Lead</button>
     </div>
   </div>
 
-  <!-- SALESMAN BANNER (shows when in salesman mode) -->
-  <div id="salesman-banner" style="display:none;background:linear-gradient(135deg,#0e4d2e,#166534);border:1px solid #16a34a;border-radius:10px;padding:14px 20px;margin-bottom:18px;display:none;">
+  <!-- SALESMAN BANNER -->
+  <div id="salesman-banner" style="display:none;background:linear-gradient(135deg,#0e4d2e,#166534);border:1px solid #16a34a;border-radius:10px;padding:14px 20px;margin-bottom:18px;">
     <div style="font-size:14px;font-weight:800;color:#4ade80;margin-bottom:4px;">📸 Salesman Photo Mode</div>
     <div style="font-size:12px;color:#86efac;">Your two responsibilities: <strong>Pre-Work (before tear-off)</strong> and <strong>Completion / Final Inspection</strong>. Each upload is automatically labeled with your name and timestamp.</div>
   </div>
 
-  <!-- CREW BANNER (shows when in crew lead mode) -->
+  <!-- CREW BANNER -->
   <div id="crew-banner" style="display:none;background:linear-gradient(135deg,#431407,#7c2d12);border:1px solid #ea580c;border-radius:10px;padding:14px 20px;margin-bottom:18px;">
     <div style="font-size:14px;font-weight:800;color:#fb923c;margin-bottom:4px;">🔨 Crew Lead Photo Mode</div>
     <div style="font-size:12px;color:#fdba74;">Your two responsibilities: <strong>During Tear-Off</strong> and <strong>Installation in Progress</strong>. These photos document your work and are required before pay is released.</div>
   </div>
 
-  <!-- Job Type Selector -->
-  <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Job Type</div>
+  <!-- ══ JOB TYPE SELECTOR ══ -->
+  <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Job Type</div>
   <div class="type-selector" id="pc-type-selector">
     ${Object.entries(PHOTO_CHECKLISTS).map(([key,val]) => `
       <div class="type-btn ${pcState.jobType===key?'active':''}" onclick="setPCJobType('${key}')">
@@ -5405,46 +5528,46 @@ function renderPhotoChecklistPage() {
       </div>`).join('')}
   </div>
 
-  <!-- Job Info -->
+  <!-- ══ JOB INFO GRID ══ -->
   <div class="pc-job-bar">
     <div>
-      <label class="form-label">Homeowner Name</label>
-      <input class="form-input" id="pc-homeowner" value="${pcState.homeowner}" placeholder="First Last" oninput="pcState.homeowner=this.value" />
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Homeowner Name</label>
+      <input class="form-input" id="pc-homeowner" value="${pcState.homeowner}" placeholder="First Last" oninput="pcState.homeowner=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
     </div>
     <div>
-      <label class="form-label">Property Address</label>
-      <input class="form-input" id="pc-address" value="${pcState.address}" placeholder="123 Main St, St. Louis MO" oninput="pcState.address=this.value" />
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Property Address</label>
+      <input class="form-input" id="pc-address" value="${pcState.address}" placeholder="123 Main St, St. Louis MO" oninput="pcState.address=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
     </div>
     <div>
-      <label class="form-label">Job # (JN)</label>
-      <input class="form-input" id="pc-jobnum" value="${pcState.jobNum}" placeholder="4990" oninput="pcState.jobNum=this.value" />
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Job # (JN)</label>
+      <input class="form-input" id="pc-jobnum" value="${pcState.jobNum}" placeholder="4990" oninput="pcState.jobNum=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
     </div>
     <div>
-      <label class="form-label">Crew / Foreman</label>
-      <input class="form-input" id="pc-crew" value="${pcState.crew||''}" placeholder="Foreman name" oninput="pcState.crew=this.value" />
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Crew / Foreman</label>
+      <input class="form-input" id="pc-crew" value="${pcState.crew||''}" placeholder="Foreman name" oninput="pcState.crew=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
     </div>
   </div>
 
-  <!-- Progress Summary -->
+  <!-- ══ PROGRESS STAT CARDS ══ -->
   <div class="pc-summary-grid" id="pc-summary"></div>
 
-  <!-- Pay Hold Banner (shows when missing required) -->
-  <div class="pay-hold-banner" id="pc-pay-hold" style="display:none">
+  <!-- ══ PAY HOLD BANNER ══ -->
+  <div class="pay-hold-banner" id="pc-pay-hold" style="display:none;">
     <div class="pay-hold-icon">&#x1F512;</div>
     <div>
-      <div class="pay-hold-title">PAY HOLD -- Required Photos Missing</div>
+      <div class="pay-hold-title">PAY HOLD — Required Photos Missing</div>
       <div class="pay-hold-sub" id="pc-pay-hold-msg">Complete all required photos to release crew pay.</div>
     </div>
   </div>
 
-  <!-- Checklist Sections -->
+  <!-- ══ CHECKLIST SECTIONS ══ -->
   <div id="pc-checklist-body"></div>
 
-  <!-- Submit -->
-  <div style="margin-top:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+  <!-- ══ SUBMIT ══ -->
+  <div style="margin-top:28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
     <button class="submit-review-btn" onclick="submitPhotoChecklist()">&#x2705; Submit for Review</button>
-    <button class="btn btn-ghost" onclick="clearPhotoChecklist()">&#x1F5D1; Clear & Start Over</button>
-    <span style="font-size:12px;color:var(--text2)" id="pc-submit-status"></span>
+    <button class="btn btn-ghost" onclick="clearPhotoChecklist()" style="font-weight:700;">&#x1F5D1; Clear &amp; Start Over</button>
+    <span style="font-size:12px;color:#64748b;" id="pc-submit-status"></span>
   </div>
   `;
 
@@ -5710,19 +5833,35 @@ function updatePCSummary() {
   if (summaryEl) summaryEl.innerHTML = `
     <div class="pc-stat">
       <div class="pc-stat-label">Required Done</div>
-      <div class="pc-stat-val" style="color:${doneRequired===totalRequired?'var(--green)':'var(--red)'}">${doneRequired}/${totalRequired}</div>
+      <div class="pc-stat-val" style="color:${doneRequired===totalRequired?'#16a34a':'#dc2626'};font-size:2.5rem;">${doneRequired}/${totalRequired}</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${totalRequired>0?Math.round(doneRequired/totalRequired*100):0}%;background:${doneRequired===totalRequired?'#16a34a':'#dc2626'}"></div>
+        </div>
+      </div>
     </div>
     <div class="pc-stat">
       <div class="pc-stat-label">Optional Done</div>
-      <div class="pc-stat-val" style="color:var(--text2)">${doneOptional}/${totalOptional}</div>
+      <div class="pc-stat-val" style="color:#64748b;font-size:2.5rem;">${doneOptional}/${totalOptional}</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${totalOptional>0?Math.round(doneOptional/totalOptional*100):0}%"></div>
+        </div>
+      </div>
     </div>
     <div class="pc-stat">
-      <div class="pc-stat-label">Total Photos</div>
-      <div class="pc-stat-val" style="color:var(--blue)">${done}</div>
+      <div class="pc-stat-label">Total Uploaded</div>
+      <div class="pc-stat-val" style="color:#2563eb;font-size:2.5rem;">${done}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px;">of ${total} total photos</div>
     </div>
     <div class="pc-stat">
       <div class="pc-stat-label">Completion</div>
-      <div class="pc-stat-val" style="color:${pct===100?'var(--green)':pct>60?'var(--yellow)':'var(--orange)'}">${pct}%</div>
+      <div class="pc-stat-val" style="color:${pct===100?'#16a34a':pct>60?'#d97706':'#dc2626'};font-size:2.5rem;">${pct}%</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${pct}%"></div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -5730,7 +5869,7 @@ function updatePCSummary() {
   const payHoldMsg = document.getElementById('pc-pay-hold-msg');
   if (payHold) {
     payHold.style.display = missingRequired > 0 ? 'flex' : 'none';
-    if (payHoldMsg) payHoldMsg.textContent = `${missingRequired} required photo${missingRequired===1?'':'s'} missing -- crew pay is on hold until all required photos are uploaded and verified by Austin.`;
+    if (payHoldMsg) payHoldMsg.textContent = \`\${missingRequired} required photo\${missingRequired===1?'':'s'} missing — crew pay is on hold until all required photos are uploaded and verified by Austin.\`;
   }
 }
 
