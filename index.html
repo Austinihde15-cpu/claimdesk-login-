@@ -1772,7 +1772,7 @@ async function showTeamManager(){
       <div style="font-size:13px;font-weight:600;margin-bottom:9px;">Invite Team Member</div>
       <input id="invite-email" type="email" placeholder="teammate@email.com" style="width:100%;padding:9px 12px;background:var(--navy3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;margin-bottom:7px;">
       <input id="invite-name" type="text" placeholder="Full Name" style="width:100%;padding:9px 12px;background:var(--navy3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;margin-bottom:9px;">
-      <button onclick="sendInvite()" style="width:100%;padding:9px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:13px;cursor:pointer;">Send Invite -></button>
+      <button onclick="sendInviteInline()" style="width:100%;padding:9px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:13px;cursor:pointer;">Send Invite -></button>
       <div id="invite-msg" style="font-size:12px;margin-top:7px;"></div>
     </div>`:''}
   `);
@@ -1788,7 +1788,7 @@ async function showTeamManager(){
   }catch(e){console.error(e);}
 }
 
-async function sendInvite(){
+async function sendInviteInline(){
   const email=document.getElementById('invite-email')?.value.trim();
   const name=document.getElementById('invite-name')?.value.trim();
   const msgEl=document.getElementById('invite-msg');
@@ -3826,10 +3826,19 @@ async function sendInvite() {
   const msg   = document.getElementById('inv-msg');
   msg.textContent=''; msg.style.color='#B22234';
   if (!email||!email.includes('@')) { msg.textContent='Enter a valid email.'; return; }
+  // Guard: must have session data before sending
+  if (!state.company?.id) { msg.textContent='Session error — please refresh and try again.'; return; }
+  if (!state.user?.email) { msg.textContent='Session error — user email missing. Please refresh.'; return; }
   const btn = document.querySelector('#invite-modal .btn-primary');
   if(btn) { btn.disabled=true; btn.textContent='Sending...'; }
   try {
-    const r = await callFunction('inviteUser', { email, full_name:name, role, company_id:state.company?.id });
+    const r = await callFunction('inviteUser', {
+      company_id:    state.company.id,
+      inviter_email: state.user.email,
+      invite_email:  email,
+      invite_name:   name || email,
+      role
+    });
     if (r.ok) {
       showToast('✅ Invite sent to '+email,'success');
       document.getElementById('invite-modal').remove();
