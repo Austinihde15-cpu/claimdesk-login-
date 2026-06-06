@@ -4664,6 +4664,30 @@ function renderDocBuilderPage() {
             </select></div>
         </div>
         <hr style="border-color:var(--border);margin:16px 0">
+        <!-- ── GAF / Shingle System Templates ── -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">&#x1F3D7; Load Template:</div>
+          <select id="gaf-template-select" class="form-input" style="max-width:340px;font-weight:600;"
+            onchange="loadGAFTemplate(this.value);this.value=''">
+            <option value="">-- Shingle System Templates --</option>
+            <optgroup label="GAF Timberline">
+              <option value="gaf_hdz_full">Full Roof — GAF Timberline HDZ (Asphalt)</option>
+              <option value="gaf_hdz_ins">Full Roof — GAF Timberline HDZ + Insurance Scope</option>
+              <option value="gaf_cs_full">Full Roof — GAF Timberline CS (Cool Series)</option>
+              <option value="gaf_arh_full">Full Roof — GAF American Harvest (High-Wind)</option>
+            </optgroup>
+            <optgroup label="Other Manufacturers">
+              <option value="oc_duration_full">Full Roof — Owens Corning Duration</option>
+              <option value="ct_landmark_full">Full Roof — CertainTeed Landmark</option>
+            </optgroup>
+            <optgroup label="Flat / Low-Slope">
+              <option value="modbit_full">Flat Roof — Modified Bitumen (Torch-Down)</option>
+            </optgroup>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="if(confirm('Clear all line items?')){estLines=[];renderEstLines();}" style="white-space:nowrap;font-weight:700;">
+            &#x1F5D1; Clear All Lines
+          </button>
+        </div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Quick Add Line Item</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;margin-bottom:12px;align-items:flex-end">
           <div><label class="form-label">Trade</label>
@@ -4700,10 +4724,31 @@ function renderDocBuilderPage() {
         </div>
         <div class="line-item-header"><span>Description</span><span>Qty</span><span>Unit</span><span>Unit Price</span><span>Total</span><span></span></div>
         <div id="est-lines"><div style="text-align:center;color:var(--text2);padding:20px;font-size:13px">No line items yet</div></div>
+        <!-- O&P Controls -->
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:12px 16px;background:var(--navy3);border:1px solid var(--border);border-radius:10px;margin-top:14px;margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Include in Total:</span>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;">
+            <input type="checkbox" id="op-include-overhead" checked onchange="recalcEst()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue);">
+            Overhead
+            <input type="number" id="op-overhead-pct" value="10" min="0" max="50" step="0.5"
+              style="width:52px;padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-weight:700;outline:none;"
+              oninput="recalcEst()">
+            <span style="font-size:12px;color:var(--text2);">%</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;">
+            <input type="checkbox" id="op-include-profit" checked onchange="recalcEst()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue);">
+            Profit
+            <input type="number" id="op-profit-pct" value="10" min="0" max="50" step="0.5"
+              style="width:52px;padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-weight:700;outline:none;"
+              oninput="recalcEst()">
+            <span style="font-size:12px;color:var(--text2);">%</span>
+          </label>
+          <span style="font-size:11px;color:var(--text2);margin-left:auto;">Roof-only job = 5%/5% &nbsp;|&nbsp; Multi-trade = 10%/10%</span>
+        </div>
         <div class="totals-box">
           <div class="totals-row"><span class="label">Subtotal</span><span class="val" id="est-subtotal">$0.00</span></div>
-          <div class="totals-row"><span class="label">Overhead (10%)</span><span class="val" id="est-overhead">$0.00</span></div>
-          <div class="totals-row"><span class="label">Profit (10%)</span><span class="val" id="est-profit">$0.00</span></div>
+          <div class="totals-row" id="est-overhead-row"><span class="label" id="est-overhead-lbl">Overhead (10%)</span><span class="val" id="est-overhead">$0.00</span></div>
+          <div class="totals-row" id="est-profit-row"><span class="label" id="est-profit-lbl">Profit (10%)</span><span class="val" id="est-profit">$0.00</span></div>
           <div class="totals-row"><span class="label">Material Sales Tax (9.679%)</span><span class="val" id="est-tax">$0.00</span></div>
           <div class="totals-row"><span>TOTAL RCV</span><span id="est-grand">$0.00</span></div>
         </div>
@@ -4830,6 +4875,147 @@ function renderEstLines() {
   recalcEst();
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  GAF & Shingle System Templates — Realistic full roof systems
+//  All qtys default to 35 SQ — user edits after load
+// ═══════════════════════════════════════════════════════════════════
+const GAF_TEMPLATES = {
+
+  // ── 1. Full Roof — GAF Timberline HDZ (standard insurance scope) ──
+  gaf_hdz_full: {
+    name: "Full Roof — GAF Timberline HDZ",
+    lines: [
+      { desc: "GAF Timberline HDZ — Weathered Wood (Shingles)", qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF FeltBuster Synthetic Underlayment",          qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF WeatherWatch Ice & Water Shield (Eaves/Valleys)", qty: 5,  unit: "SQ",  price: 0 },
+      { desc: "GAF TimberTex Premium Ridge Cap Shingles",       qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF ProStart Eave/Rake Starter Strip",           qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF Cobra Ridge Vent (Continuous Ridge Vent)",   qty: 30, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Eaves (2x4 mill finish)", qty: 80, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Rakes (2x4 mill finish)", qty: 60, unit: "LF",  price: 0 },
+      { desc: "Step Flashing / Counter Flashing (Aluminum)",    qty: 20, unit: "LF",  price: 0 },
+      { desc: "Roofing Nails — Coil (1-3/4\")",                qty: 2,  unit: "BOX", price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",       qty: 35, unit: "SQ",  price: 0 },
+    ]
+  },
+
+  // ── 2. Full Roof — GAF Timberline HDZ + Insurance Supplement Items ──
+  gaf_hdz_ins: {
+    name: "Full Roof — GAF HDZ w/ Insurance Supplement",
+    lines: [
+      { desc: "GAF Timberline HDZ — Charcoal (Shingles)",       qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF FeltBuster Synthetic Underlayment",          qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF WeatherWatch Ice & Water Shield (Eaves/Valleys)", qty: 5, unit: "SQ",  price: 0 },
+      { desc: "GAF TimberTex Premium Ridge Cap Shingles",       qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF ProStart Eave/Rake Starter Strip",           qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF Cobra Ridge Vent",                           qty: 30, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Eaves",                   qty: 80, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Rakes",                   qty: 60, unit: "LF",  price: 0 },
+      { desc: "Step Flashing / Counter Flashing",               qty: 20, unit: "LF",  price: 0 },
+      { desc: "Pipe Jack Flashing (Boot) — 3\" PVC",            qty: 3,  unit: "EA",  price: 0 },
+      { desc: "Chimney Flashing — Counterflash & Step",         qty: 1,  unit: "EA",  price: 0 },
+      { desc: "Plywood Decking Replacement (7/16\" OSB)",       qty: 4,  unit: "SH",  price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",       qty: 35, unit: "SQ",  price: 0 },
+      { desc: "Dumpster / Haul-Away Fee",                       qty: 1,  unit: "EA",  price: 0 },
+    ]
+  },
+
+  // ── 3. Full Roof — GAF Timberline CS (Cool Series, white/light colors) ──
+  gaf_cs_full: {
+    name: "Full Roof — GAF Timberline CS (Cool Series)",
+    lines: [
+      { desc: "GAF Timberline CS — Barkwood (Cool Series Shingles)", qty: 35, unit: "SQ", price: 0 },
+      { desc: "GAF FeltBuster Synthetic Underlayment",               qty: 35, unit: "SQ", price: 0 },
+      { desc: "GAF WeatherWatch Ice & Water Shield",                  qty: 5,  unit: "SQ", price: 0 },
+      { desc: "GAF TimberTex Double-Layer Ridge Cap",                 qty: 30, unit: "LF", price: 0 },
+      { desc: "GAF ProStart Starter Strip",                          qty: 30, unit: "LF", price: 0 },
+      { desc: "GAF Cobra Snow Country Ridge Vent",                   qty: 30, unit: "LF", price: 0 },
+      { desc: "Aluminum Drip Edge — Eaves",                          qty: 80, unit: "LF", price: 0 },
+      { desc: "Aluminum Drip Edge — Rakes",                          qty: 60, unit: "LF", price: 0 },
+      { desc: "Step / Counter Flashing (Aluminum)",                  qty: 20, unit: "LF", price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",            qty: 35, unit: "SQ", price: 0 },
+    ]
+  },
+
+  // ── 4. Full Roof — GAF American Harvest (High-Wind / Enhanced) ──
+  gaf_arh_full: {
+    name: "Full Roof — GAF American Harvest (Enhanced Class IV)",
+    lines: [
+      { desc: "GAF American Harvest Shingles — Slate",          qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF StormGuard Film-Surfaced Ice & Water Shield",qty: 10, unit: "SQ",  price: 0 },
+      { desc: "GAF FeltBuster Synthetic Underlayment (2-layer)", qty: 35, unit: "SQ",  price: 0 },
+      { desc: "GAF Seal-A-Ridge Class IV Ridge Cap",             qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF WeatherBlocker Pro Starter Strip",            qty: 30, unit: "LF",  price: 0 },
+      { desc: "GAF Cobra Snow Country Advanced Ridge Vent",      qty: 30, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Eaves",                    qty: 80, unit: "LF",  price: 0 },
+      { desc: "Galvanized Drip Edge — Rakes",                    qty: 60, unit: "LF",  price: 0 },
+      { desc: "Step Flashing & Counter Flashing (Aluminum)",     qty: 20, unit: "LF",  price: 0 },
+      { desc: "High-Wind Fastening — 6-Nail Pattern Labor",      qty: 35, unit: "SQ",  price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",        qty: 35, unit: "SQ",  price: 0 },
+    ]
+  },
+
+  // ── 5. Full Roof — Owens Corning Duration ──
+  oc_duration_full: {
+    name: "Full Roof — Owens Corning Duration",
+    lines: [
+      { desc: "Owens Corning Duration — Charcoal (SureNail Shingles)", qty: 35, unit: "SQ", price: 0 },
+      { desc: "Owens Corning WeatherLock Ice & Water Barrier",          qty: 5,  unit: "SQ", price: 0 },
+      { desc: "Owens Corning Deck Defense Synthetic Underlayment",      qty: 35, unit: "SQ", price: 0 },
+      { desc: "Owens Corning Hip & Ridge 12 Cap Shingles",              qty: 30, unit: "LF", price: 0 },
+      { desc: "Owens Corning Starter Strip Plus",                       qty: 30, unit: "LF", price: 0 },
+      { desc: "Owens Corning VentSure Ridge Vent",                      qty: 30, unit: "LF", price: 0 },
+      { desc: "Galvanized Drip Edge — Eaves",                           qty: 80, unit: "LF", price: 0 },
+      { desc: "Galvanized Drip Edge — Rakes",                           qty: 60, unit: "LF", price: 0 },
+      { desc: "Step / Counter Flashing",                                qty: 20, unit: "LF", price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",               qty: 35, unit: "SQ", price: 0 },
+    ]
+  },
+
+  // ── 6. Full Roof — CertainTeed Landmark ──
+  ct_landmark_full: {
+    name: "Full Roof — CertainTeed Landmark",
+    lines: [
+      { desc: "CertainTeed Landmark — Charcoal Black (Shingles)", qty: 35, unit: "SQ", price: 0 },
+      { desc: "CertainTeed WinterGuard Ice & Water Barrier",       qty: 5,  unit: "SQ", price: 0 },
+      { desc: "CertainTeed DiamondDeck Synthetic Underlayment",    qty: 35, unit: "SQ", price: 0 },
+      { desc: "CertainTeed CT Hip & Ridge Cap Shingles",           qty: 30, unit: "LF", price: 0 },
+      { desc: "CertainTeed SwiftStart Starter Strip",              qty: 30, unit: "LF", price: 0 },
+      { desc: "CertainTeed RidgeVent III",                         qty: 30, unit: "LF", price: 0 },
+      { desc: "Aluminum Drip Edge — Eaves",                        qty: 80, unit: "LF", price: 0 },
+      { desc: "Aluminum Drip Edge — Rakes",                        qty: 60, unit: "LF", price: 0 },
+      { desc: "Step / Counter Flashing",                           qty: 20, unit: "LF", price: 0 },
+      { desc: "Roofing Labor — Tear-Off & Install (RFG)",          qty: 35, unit: "SQ", price: 0 },
+    ]
+  },
+
+  // ── 7. Flat Roof — Modified Bitumen Torch-Down System ──
+  modbit_full: {
+    name: "Flat Roof — Modified Bitumen (Torch-Down)",
+    lines: [
+      { desc: "Modified Bitumen Base Sheet (SBS)",               qty: 10, unit: "SQ", price: 0 },
+      { desc: "Modified Bitumen Cap Sheet — Granule Surface",    qty: 10, unit: "SQ", price: 0 },
+      { desc: "GAF Liberty SBS Self-Adhering Base Sheet",        qty: 10, unit: "SQ", price: 0 },
+      { desc: "Asphaltic Primer / Bonding Adhesive",             qty: 5,  unit: "GL", price: 0 },
+      { desc: "Perimeter Metal Edge (Gravel Stop 4\")",          qty: 40, unit: "LF", price: 0 },
+      { desc: "Roof Drain / Scupper Replacement",                qty: 2,  unit: "EA", price: 0 },
+      { desc: "Flat Roof Labor — Tear-Off & Install",            qty: 10, unit: "SQ", price: 0 },
+    ]
+  },
+};
+
+// Load a template into estLines — fully editable after
+function loadGAFTemplate(key) {
+  if (!key || !GAF_TEMPLATES[key]) return;
+  const tpl = GAF_TEMPLATES[key];
+  if (estLines.length > 0 && !confirm('Replace current line items with "' + tpl.name + '" template?')) return;
+  estLines = tpl.lines.map(l => ({ ...l })); // deep copy so template is never mutated
+  renderEstLines();
+  recalcEst();
+  showToast('Loaded: ' + tpl.name + ' (' + tpl.lines.length + ' lines) — update quantities and prices.', 'success');
+}
+
 function addBlankLine() { estLines.push({desc:"",qty:1,unit:"EA",price:0}); renderEstLines(); }
 function clearEstimate() { estLines=[]; renderEstLines(); }
 function addLineToEstimate() {
@@ -4849,19 +5035,36 @@ function addLineToEstimate() {
 
 function recalcEst() {
   const subtotal = estLines.reduce((s,l) => s + (l.qty * l.price), 0);
-  const oh = subtotal * 0.10; const profit = subtotal * 0.10;
-  const tax = subtotal * 0.09679; const grand = subtotal + oh + profit + tax;
-  const fmt = v => '$' + v.toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
   const el = id => document.getElementById(id);
+  const fmt = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  // Read O&P toggles — fall back gracefully if DOM not ready
+  const inclOH = el('op-include-overhead') ? el('op-include-overhead').checked : true;
+  const inclPR = el('op-include-profit')   ? el('op-include-profit').checked   : true;
+  const ohPct  = el('op-overhead-pct') ? (parseFloat(el('op-overhead-pct').value) || 0) / 100 : 0.10;
+  const prPct  = el('op-profit-pct')   ? (parseFloat(el('op-profit-pct').value)  || 0) / 100 : 0.10;
+
+  const oh     = inclOH ? subtotal * ohPct : 0;
+  const profit = inclPR ? subtotal * prPct : 0;
+  const tax    = subtotal * 0.09679;
+  const grand  = subtotal + oh + profit + tax;
+
   if (el('est-subtotal')) el('est-subtotal').textContent = fmt(subtotal);
+
+  // Overhead row — show/hide + live label
+  if (el('est-overhead-row')) el('est-overhead-row').style.display = inclOH ? '' : 'none';
+  if (el('est-overhead-lbl')) el('est-overhead-lbl').textContent = 'Overhead (' + (ohPct*100).toFixed(1).replace('.0','') + '%)';
   if (el('est-overhead')) el('est-overhead').textContent = fmt(oh);
+
+  // Profit row — show/hide + live label
+  if (el('est-profit-row')) el('est-profit-row').style.display = inclPR ? '' : 'none';
+  if (el('est-profit-lbl')) el('est-profit-lbl').textContent = 'Profit (' + (prPct*100).toFixed(1).replace('.0','') + '%)';
   if (el('est-profit')) el('est-profit').textContent = fmt(profit);
-  if (el('est-tax')) el('est-tax').textContent = fmt(tax);
+
+  if (el('est-tax'))   el('est-tax').textContent   = fmt(tax);
   if (el('est-grand')) el('est-grand').textContent = fmt(grand);
 }
 
-// -- MATERIAL ORDER --
-let moLines = [];
 
 function renderMOLines() {
   const tbody = document.getElementById('mo-lines');
