@@ -8,6 +8,8 @@
 <!-- ClaimDesk v20260604-212450 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Cox ClaimDesk</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+<link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
 <style>
 /* Inter loaded from system or local — no external font dependency */
 
@@ -5250,7 +5252,6 @@ function renderDocBuilderPage() {
 
   <!-- ═══ MATERIAL ORDER PANEL ══════════════════════════════════════════════ -->
   <div class="doc-panel" id="panel-matorder">
-    <script>if(typeof window._moLines==="undefined")window._moLines=[];<\/script>
     <div id="mo-panel-inner"></div>
   </div>
 
@@ -5582,7 +5583,7 @@ function printEstimate() {
     We do not act as engineers, lawyers, representatives, public adjusters, or policy holders.
   </div>
 </div>
-<script>window.print();<\/script>
+<scr'+'ipt>window.print();</'+'script>
 </body></html>`);
   win.document.close();
 }
@@ -5668,7 +5669,7 @@ function printEstimateMOView() {
   <div class="foot">Cox Roofing &amp; Restoration &bull; 860 Hanley Industrial Ct, Brentwood MO 63144 &bull; (314) 310-7663<br>
     Please confirm all quantities before ordering. Quantities based on satellite measurements — field verify before pulling.</div>
 </div>
-<script>window.print();<\/script>
+<scr'+'ipt>window.print();</'+'script>
 </body></html>`);
   win.document.close();
 }
@@ -8000,9 +8001,7 @@ async function submitJobNote(jobJnid, containerId) {
   if (!text) { showToast('Note cannot be empty.', 'error'); return; }
   try {
     const r = await callFunction('jnProxy', { endpoint: '/activities', method: 'POST', body: { type:'activity', note: text, related: [{ id: jobJnid, type:'job' }] } });
-    // Fake a Response-like object for compatibility
-    const _fakeR = { ok: r.ok !== false
-    });
+    // Response handled directly via r.ok
     if (!r.ok) throw new Error('JN error ' + r.status);
     document.getElementById('_add-note-modal')?.remove();
     showToast('Note saved to JobNimbus ✓', 'success');
