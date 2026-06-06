@@ -2578,7 +2578,7 @@ function renderClaimDetail(data) {
     </div>
 
     <div id="claim-tab-content">
-      ${renderDocsTab(d.attachments||[], c.id)}
+      ${renderDocsTab(attachments||[], c.id)}
     </div>
   `;
 }
@@ -3139,7 +3139,7 @@ async function saveCompanyAccount() {
   const msg = document.getElementById('co-msg');
   if (!fields.name) { msg.style.color='#B22234'; msg.textContent='Company name is required.'; return; }
   try {
-    const r = await callFunction('entityUpsert', { entity:'Company', id: co.id, data: fields });
+    const r = await callFunction('entityFetch', { action:'update', entity:'Company', id: co.id, data: fields });
     if (r.ok || r.id || r.record) {
       state.company = { ...co, ...fields };
       const s = getSession(); if(s){ s.company = state.company; localStorage.setItem('cd_session', JSON.stringify(s)); }
@@ -3238,7 +3238,7 @@ async function saveUserEdit(uid) {
   const role  = document.getElementById('ue-role-'+uid)?.value;
   const msg   = document.getElementById('ue-msg-'+uid);
   try {
-    const r = await callFunction('entityUpsert', { entity:'CompanyUser', id: uid, data: { full_name: name, phone, role } });
+    const r = await callFunction('entityFetch', { action:'update', entity:'CompanyUser', id: uid, data: { full_name: name, phone, role } });
     if (r.ok || r.id || r.record) {
       msg.style.color='#15803D'; msg.textContent='✅ Saved!';
       setTimeout(()=>loadUsersTab(), 1000);
@@ -3248,7 +3248,7 @@ async function saveUserEdit(uid) {
 
 async function setUserStatus(uid, status) {
   try {
-    await callFunction('entityUpsert', { entity:'CompanyUser', id: uid, data: { status } });
+    await callFunction('entityFetch', { action:'update', entity:'CompanyUser', id: uid, data: { status } });
     showToast(status === 'active' ? '✅ User reactivated.' : '⏸ User suspended.');
     setTimeout(()=>loadUsersTab(), 600);
   } catch(e) { showToast('❌ '+e.message); }
@@ -3580,7 +3580,7 @@ async function clearStaleAnomalies() {
 async function resetCompanyStats() {
   if (!confirm('Reset this month\'s usage counters? This only affects display counts, not billing.')) return;
   try {
-    await callFunction('entityUpsert', { entity:'Company', id: state.company?.id, data:{ estimates_used_this_month:0 }});
+    await callFunction('entityFetch', { action:'update', entity:'Company', id: state.company?.id, data:{ estimates_used_this_month:0 }});
     showToast('✅ Usage counters reset.');
     state.company = {...state.company, estimates_used_this_month:0};
   } catch(e) { showToast('❌ '+e.message); }
@@ -4438,7 +4438,8 @@ function showTutorialModal() {
   }
 })();
 </script>
-<script>// ═══════════════════════════════════════════════════════════════════════════════
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT BUILDER v3 — Complete Rewrite  June 2026
 //  Cox Roofing & Restoration | MOSL8X | STL 2026 Pricing
 //  Supports: Estimate (Xactimate codes) + Material Order (brand SKUs) from same data
@@ -4789,517 +4790,588 @@ function loadGAFTemplate(key) {
 
 
 // ─── RENDER DOC BUILDER PAGE ─────────────────────────────────────────────────
-function renderDocBuilderPage() {
-  document.getElementById('content').innerHTML = `
+function renderDocBuilderPage(preloadJobId) {
+  // ── State ─────────────────────────────────────────────────────────────────
+  window._dbState = window._dbState || {};
+  const DS = window._dbState;
+  DS.tab = DS.tab || 'estimate';
+  DS.lines = DS.lines || [];
+  DS.moLines = DS.moLines || [];
+  DS.woLines = DS.woLines || [];
+  DS.job = DS.job || null;
+
+  if (preloadJobId) DS.preloadJobId = preloadJobId;
+
+  // ── CSS ───────────────────────────────────────────────────────────────────
+  const css = `
   <style>
-    /* ══════════════════════════════════════════════════════════════════
-       DOC BUILDER v3 STYLES  — June 2026
-    ══════════════════════════════════════════════════════════════════ */
+  .dbb{display:flex;flex-direction:column;gap:0;height:100%;min-height:0}
+  .db-topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .db-topbar h2{margin:0;font-size:20px;font-weight:800;color:var(--text1)}
+  .dbt{display:flex;gap:4px;padding:5px;background:var(--surface2);border-radius:12px;margin-bottom:20px;width:fit-content;border:1px solid var(--border);flex-wrap:wrap}
+  .dbt-t{padding:8px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--text2);transition:all .15s;white-space:nowrap}
+  .dbt-t.active{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(30,111,255,.3)}
+  .db-job-banner{background:linear-gradient(135deg,#1345A8,#1e6fff);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .db-job-banner .jb-name{font-size:16px;font-weight:800}
+  .db-job-banner .jb-addr{font-size:12px;opacity:.85}
+  .db-job-banner .jb-badge{background:rgba(255,255,255,.18);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700}
+  .db-select-card{background:var(--surface);border:2px dashed var(--border);border-radius:14px;padding:32px 24px;text-align:center;margin-bottom:20px}
+  .db-select-card h3{font-size:17px;font-weight:800;margin:0 0 10px;color:var(--text1)}
+  .db-select-card p{font-size:13px;color:var(--text2);margin:0 0 18px}
+  .jb-sel{width:100%;max-width:520px;padding:11px 14px;border:2px solid var(--primary);border-radius:10px;font-size:14px;font-weight:600;background:var(--surface2);color:var(--text1);cursor:pointer}
+  .jb-sel:focus{outline:none;box-shadow:0 0 0 3px rgba(30,111,255,.18)}
+  .db-sec{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--primary);text-transform:uppercase;padding:10px 0 6px;border-bottom:1.5px solid var(--border);margin-bottom:12px;margin-top:4px}
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .fg{display:flex;flex-direction:column;gap:5px}
+  .fg.span2{grid-column:span 2}
+  .fg.span3{grid-column:span 3}
+  .fg label{font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+  .fg input,.fg select,.fg textarea{padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text1);font-size:13px;outline:none;width:100%;box-sizing:border-box;transition:border-color .14s}
+  .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,111,255,.1)}
+  .fg textarea{resize:vertical;min-height:72px}
+  .tpl-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:var(--surface2);border-radius:10px;margin-bottom:16px;border:1px solid var(--border)}
+  .tpl-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);color:var(--text1);transition:all .15s;white-space:nowrap}
+  .tpl-btn:hover{border-color:var(--primary);color:var(--primary);background:#e8f0fe}
+  .li-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}
+  .li-table th{background:var(--surface2);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);padding:7px 8px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+  .li-table td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .li-table tr:hover td{background:var(--surface2)}
+  .li-table input,.li-table select{padding:5px 7px;background:transparent;border:1px solid transparent;border-radius:6px;font-size:12.5px;color:var(--text1);width:100%;transition:border-color .1s}
+  .li-table input:focus,.li-table select:focus{border-color:var(--primary);background:var(--surface2);outline:none}
+  .li-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+  .li-del:hover{background:#fee2e2}
+  .li-tot{font-weight:700;color:var(--green);min-width:70px;display:inline-block;text-align:right}
+  .totals-box{background:var(--surface2);border-radius:10px;padding:16px 20px;border:1px solid var(--border);min-width:260px}
+  .totals-box .tr{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:var(--text2)}
+  .totals-box .tr.bold{font-weight:800;color:var(--text1);font-size:15px;border-top:2px solid var(--border);padding-top:8px;margin-top:4px}
+  .totals-box .tr.green{color:var(--green)}
+  .wo-cat{font-size:10px;font-weight:800;color:var(--primary);background:#e8f0fe;padding:2px 8px;border-radius:6px;margin-left:6px;text-transform:uppercase}
+  .db-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:20px}
+  .spinner-sm{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+  @media(max-width:700px){.fgrid{grid-template-columns:1fr;}.fg.span2,.fg.span3{grid-column:span 1}.dbt-t{padding:7px 14px}}
+  </style>`;
 
-    /* Tab bar */
-    .dbt{display:flex;gap:4px;padding:5px;background:var(--surface2);
-         border-radius:12px;margin-bottom:24px;width:fit-content;border:1px solid var(--border)}
-    .dbt-t{padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;
-           color:var(--text2);background:transparent;border:none;transition:all .18s;white-space:nowrap}
-    .dbt-t.active{background:var(--primary);color:#fff;box-shadow:0 2px 10px rgba(30,111,255,.28)}
-    .dbt-t:hover:not(.active){background:rgba(255,255,255,.06);color:var(--text)}
+  document.getElementById('content').innerHTML = css + '<div class="dbb" id="db-root"><div id="db-inner"></div></div>';
+  renderDBInner();
+}
 
-    .doc-panel{display:none}.doc-panel.active{display:block}
+// ─────────────────────────────────────────────────────────────────────────────
+// INNER RENDER — called after job selection changes
+// ─────────────────────────────────────────────────────────────────────────────
+function renderDBInner() {
+  const DS = window._dbState || {};
+  const el = document.getElementById('db-inner');
+  if (!el) return;
 
-    /* Section dividers */
-    .db-sec{display:flex;align-items:center;gap:9px;margin:22px 0 12px;
-            font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
-    .db-sec::after{content:'';flex:1;height:1px;background:var(--border);opacity:.6}
+  const today = new Date().toISOString().slice(0, 10);
 
-    /* Job info / form grid */
-    .fgrid{display:grid;gap:12px;grid-template-columns:repeat(3,1fr)}
-    @media(max-width:820px){.fgrid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:500px){.fgrid{grid-template-columns:1fr}}
-    .fgrid .span2{grid-column:span 2}
-    @media(max-width:820px){.fgrid .span2{grid-column:span 1}}
-    .fg{display:flex;flex-direction:column;gap:4px}
-    .fg label{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
-    .fg input,.fg select{
-      padding:8px 12px;background:var(--surface2);border:1.5px solid var(--border);
-      border-radius:8px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box;
-      transition:border-color .14s,box-shadow .14s}
-    .fg input:focus,.fg select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,111,255,.1)}
+  // ── TOP BAR ──────────────────────────────────────────────────────────────
+  let html = `
+  <div class="db-topbar">
+    <div>
+      <div style="font-size:20px;font-weight:800;color:var(--text1)">&#x1F4DD; Document Builder</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">Estimate &middot; Material Order &middot; Work Order</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      ${DS.job ? `<button class="btn btn-ghost btn-sm" onclick="window._dbState.job=null;renderDBInner()">&#x1F504; Change Job</button>` : ''}
+    </div>
+  </div>`;
 
-    /* Template picker banner */
-    .tpl-banner{
-      display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-      padding:14px 18px;border-radius:12px;margin-bottom:6px;
-      background:linear-gradient(135deg,rgba(30,111,255,.08),rgba(30,111,255,.02));
-      border:1.5px solid rgba(30,111,255,.22)}
-    .tpl-icon{font-size:22px;flex-shrink:0}
-    .tpl-label{flex-shrink:0}
-    .tpl-label strong{font-size:12px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.08em}
-    .tpl-label div{font-size:10.5px;color:var(--text2);margin-top:1px}
-    .tpl-sel{
-      flex:1;min-width:180px;max-width:380px;padding:9px 13px;
-      background:var(--card);border:1.5px solid var(--border);border-radius:8px;
-      color:var(--text);font-size:13px;font-weight:600;outline:none;cursor:pointer;
-      transition:border-color .14s}
-    .tpl-sel:focus{border-color:var(--primary)}
-    .tpl-clr{
-      display:inline-flex;align-items:center;gap:5px;padding:8px 14px;
-      background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);
-      border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
-      transition:all .14s;white-space:nowrap}
-    .tpl-clr:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.06)}
-    .tpl-note{font-size:11px;color:var(--text2);padding:0 2px;margin-top:6px}
-
-    /* Quick-add box */
-    .qa-card{background:var(--surface2);border:1.5px solid var(--border);
-             border-radius:12px;padding:14px 16px;margin-bottom:4px}
-    .qa-row{display:grid;grid-template-columns:1.2fr 1.4fr 2fr 100px 80px 42px;gap:9px;align-items:flex-end}
-    @media(max-width:960px){.qa-row{grid-template-columns:1fr 1fr;gap:8px}}
-    .qa-f{display:flex;flex-direction:column;gap:4px}
-    .qa-f label{font-size:10px;font-weight:800;color:var(--text2);
-                text-transform:uppercase;letter-spacing:.07em}
-    .qa-f input,.qa-f select{
-      padding:7px 10px;background:var(--card);border:1.5px solid var(--border);
-      border-radius:7px;color:var(--text);font-size:12.5px;outline:none;
-      width:100%;box-sizing:border-box;transition:border-color .14s}
-    .qa-f input:focus,.qa-f select:focus{border-color:var(--primary)}
-    .qa-add{height:100%;min-height:34px;width:100%;background:var(--primary);
-            color:#fff;border:none;border-radius:8px;font-size:19px;font-weight:900;
-            cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
-    .qa-add:hover{background:#1660e8;transform:translateY(-1px);box-shadow:0 3px 10px rgba(30,111,255,.25)}
-
-    /* Line items table */
-    .li-wrap{border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
-    .li-hdr{
-      display:grid;padding:8px 14px;border-bottom:2px solid var(--border);background:var(--surface2);
-      font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
-    .li-hdr-est{grid-template-columns:22px 2.2fr 60px 60px 90px 85px 28px}
-    .li-hdr-mo {grid-template-columns:22px 2.6fr 1.4fr 60px 60px 90px 85px 28px}
-    .li-r{
-      display:grid;padding:7px 14px;align-items:center;
-      border-bottom:1px solid var(--border);transition:background .1s}
-    .li-r:last-child{border-bottom:none}
-    .li-r:hover{background:rgba(30,111,255,.025)}
-    .li-r-est{grid-template-columns:22px 2.2fr 60px 60px 90px 85px 28px}
-    .li-r-mo {grid-template-columns:22px 2.6fr 1.4fr 60px 60px 90px 85px 28px}
-    .li-in{
-      padding:4px 7px;background:transparent;border:1.5px solid transparent;
-      border-radius:6px;color:var(--text);font-size:12px;outline:none;
-      width:100%;box-sizing:border-box;transition:all .12s}
-    .li-in:hover{border-color:var(--border);background:var(--surface2)}
-    .li-in:focus{border-color:var(--primary);background:var(--surface2);box-shadow:0 0 0 2px rgba(30,111,255,.1)}
-    .li-sel{padding:4px 5px;background:transparent;border:1.5px solid transparent;
-            border-radius:6px;color:var(--text);font-size:12px;outline:none;cursor:pointer;
-            width:100%;transition:all .12s}
-    .li-sel:hover,.li-sel:focus{border-color:var(--primary);background:var(--surface2)}
-    .li-tot{font-size:12px;font-weight:700;color:#22c55e;text-align:right}
-    .li-del{width:26px;height:26px;border:none;background:transparent;color:var(--text2);
-            cursor:pointer;border-radius:5px;font-size:14px;transition:all .12s;
-            display:flex;align-items:center;justify-content:center}
-    .li-del:hover{background:rgba(239,68,68,.12);color:#ef4444}
-    .li-num{font-size:10.5px;font-weight:700;color:var(--text2);text-align:center}
-    .li-xcode{font-size:10.5px;font-weight:800;color:var(--primary);
-              background:rgba(30,111,255,.08);border-radius:4px;padding:2px 6px;
-              white-space:nowrap;text-align:center}
-    .li-empty{text-align:center;padding:40px 20px;color:var(--text2)}
-    .li-empty-icon{font-size:32px;opacity:.2;margin-bottom:8px}
-    .li-foot{display:flex;align-items:center;justify-content:space-between;
-             padding:8px 14px;border-top:2px solid var(--border);background:var(--surface2)}
-
-    /* Mode toggle */
-    .mode-toggle{display:flex;gap:4px;background:var(--surface2);
-                 padding:4px;border-radius:9px;border:1px solid var(--border)}
-    .mode-btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;
-              font-size:12px;font-weight:700;transition:all .15s;color:var(--text2);background:transparent}
-    .mode-btn.active{background:var(--primary);color:#fff;box-shadow:0 1px 6px rgba(30,111,255,.25)}
-
-    /* Totals layout */
-    .tots-layout{display:grid;grid-template-columns:1fr 310px;gap:18px;margin-top:20px;align-items:start}
-    @media(max-width:720px){.tots-layout{grid-template-columns:1fr}}
-
-    /* O&P panel */
-    .op-panel{background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:16px 18px}
-    .op-tit{font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;
-            letter-spacing:.1em;margin-bottom:12px}
-    .op-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
-    .op-row:last-of-type{border-bottom:none;margin-bottom:8px}
-    .op-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--primary);flex-shrink:0}
-    .op-lbl{flex:1;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;user-select:none}
-    .op-pct{width:50px;padding:4px 7px;background:var(--card);border:1.5px solid var(--border);
-            border-radius:6px;color:var(--text);font-size:12px;font-weight:700;
-            outline:none;text-align:center;transition:border-color .12s}
-    .op-pct:focus{border-color:var(--primary)}
-    .op-sym{font-size:12.5px;color:var(--text2);font-weight:600}
-    .op-note{padding:8px 10px;background:rgba(30,111,255,.06);
-             border-left:3px solid var(--primary);border-radius:6px;
-             font-size:11px;color:var(--text2);line-height:1.55;margin-top:10px}
-
-    /* Totals card */
-    .tots-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
-    .tots-r{display:flex;justify-content:space-between;align-items:center;
-            padding:9px 16px;border-bottom:1px solid var(--border);font-size:13px}
-    .tots-r:last-child{border-bottom:none}
-    .tots-r .tl{color:var(--text2);font-weight:500}
-    .tots-r .ta{font-weight:700;color:var(--text)}
-    .tots-grand{
-      display:flex;justify-content:space-between;align-items:center;padding:14px 16px;
-      background:linear-gradient(135deg,rgba(34,197,94,.1),rgba(34,197,94,.03));
-      border-top:2px solid rgba(34,197,94,.2)}
-    .tots-grand .tl{font-size:14px;font-weight:800;color:var(--text)}
-    .tots-grand .ta{font-size:18px;font-weight:900;color:#22c55e}
-
-    /* Export buttons */
-    .exp-btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-    .btn-exp{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:9px;
-             font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;border:none}
-    .btn-est{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(30,111,255,.2)}
-    .btn-est:hover{background:#1660e8;transform:translateY(-1px);box-shadow:0 4px 14px rgba(30,111,255,.3)}
-    .btn-mo{background:var(--surface2);color:var(--text);border:1.5px solid var(--border)!important;}
-    .btn-mo:hover{border-color:var(--primary)!important;color:var(--primary)}
-    .btn-copy{background:var(--surface2);color:var(--text);border:1.5px solid var(--border)!important;}
-    .btn-copy:hover{border-color:var(--primary)!important;color:var(--primary)}
-
-    /* Xactimate notes row (expandable) */
-    .xnotes-row{display:none;padding:4px 14px 8px;background:rgba(30,111,255,.03)}
-    .xnotes-row.visible{display:block}
-    .xnotes-text{font-size:11px;color:var(--text2);line-height:1.5;font-style:italic}
-  </style>
-
-  <!-- ═══ TAB BAR ══════════════════════════════════════════════════════════ -->
-  <div class="dbt">
-    <button class="dbt-t active" onclick="switchDocTab('estimate')">&#x1F4CB; Estimate</button>
-    <button class="dbt-t" onclick="switchDocTab('matorder')">&#x1F4E6; Material Order</button>
-    <button class="dbt-t" onclick="switchDocTab('workorder')">&#x1F528; Work Order</button>
-    <button class="dbt-t" onclick="switchDocTab('catalog')">&#x1F5C2; Catalog</button>
-  </div>
-
-  <!-- ═══ ESTIMATE PANEL ═══════════════════════════════════════════════════ -->
-  <div class="doc-panel active" id="panel-estimate">
-  <div class="card" style="border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
-    <div class="card-header" style="padding:18px 24px;border-bottom:1.5px solid var(--border)">
-      <div>
-        <span class="card-title" style="font-size:17px;font-weight:900">&#x1F4CB; Estimate / Supplement Builder</span>
-        <div style="font-size:11.5px;color:var(--text2);margin-top:2px">
-          Cox Roofing &amp; Restoration &nbsp;&#x2022;&nbsp; MOSL8X &nbsp;&#x2022;&nbsp; STL 2026 Pricing &nbsp;&#x2022;&nbsp; 9.679% Tax
-        </div>
+  // ── JOB SELECTION OR BANNER ───────────────────────────────────────────────
+  if (!DS.job) {
+    html += `
+    <div class="db-select-card" id="db-job-select-card">
+      <div style="font-size:40px;margin-bottom:10px">&#x1F3E0;</div>
+      <h3>Select a Job to Get Started</h3>
+      <p>Choose an existing job from JobNimbus to auto-populate fields.<br>Only jobs without a complete document set are shown.</p>
+      <div style="display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+        <select class="jb-sel" id="db-job-dropdown" onchange="dbSelectJob(this.value)">
+          <option value="">&#x23F3; Loading jobs...</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="dbLoadJobs()">&#x21BB; Refresh</button>
       </div>
-      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-        <!-- Mode toggle: Estimate vs Material Order view -->
-        <div class="mode-toggle" id="est-mode-toggle">
-          <button class="mode-btn active" id="mode-est" onclick="setEstMode('estimate')"
-            title="Show Xactimate codes + descriptions">&#x1F4CB; Estimate View</button>
-          <button class="mode-btn" id="mode-mo" onclick="setEstMode('matorder')"
-            title="Show supplier brand names (for MO)">&#x1F4E6; Material Order View</button>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="clearEstimate()">&#x1F5D1; Reset</button>
+      <div id="db-job-status" style="font-size:12px;color:var(--text2)"></div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Or create a new manual document:</div>
+        <button class="btn btn-ghost btn-sm" onclick="dbUseBlankJob()">&#x2795; New Blank Document</button>
+      </div>
+    </div>`;
+  } else {
+    const j = DS.job;
+    const docList = (DS.job._docs || []).join(' &middot; ') || 'No prior documents';
+    html += `
+    <div class="db-job-banner">
+      <div style="font-size:28px">&#x1F3E0;</div>
+      <div style="flex:1;min-width:0">
+        <div class="jb-name">${j.insured_name || j.name || 'Unknown Homeowner'}</div>
+        <div class="jb-addr">${j.address || ''}${j.city ? ', '+j.city : ''}${j.state ? ' '+j.state : ''}${j.zip ? ' '+j.zip : ''}</div>
+        <div style="margin-top:4px;font-size:11px;opacity:.75">${docList}</div>
+      </div>
+      ${j.job_number ? `<div class="jb-badge">JN #${j.job_number}</div>` : ''}
+      ${j.carrier ? `<div class="jb-badge">${j.carrier}</div>` : ''}
+      ${j.status ? `<div class="jb-badge">${j.status}</div>` : ''}
+    </div>`;
+  }
+
+  // ── TAB BAR (shown when job is selected OR blank mode) ───────────────────
+  if (DS.job || DS.blankMode) {
+    html += `
+    <div class="dbt">
+      <button class="dbt-t ${DS.tab==='estimate'?'active':''}" onclick="window._dbState.tab='estimate';renderDBInner()">&#x1F4CB; Estimate</button>
+      <button class="dbt-t ${DS.tab==='matorder'?'active':''}" onclick="window._dbState.tab='matorder';renderDBInner()">&#x1F9F1; Material Order</button>
+      <button class="dbt-t ${DS.tab==='workorder'?'active':''}" onclick="window._dbState.tab='workorder';renderDBInner()">&#x1F528; Work Order</button>
+    </div>`;
+
+    if (DS.tab === 'estimate') html += buildEstimateTab();
+    else if (DS.tab === 'matorder') html += buildMaterialOrderTab();
+    else if (DS.tab === 'workorder') html += buildWorkOrderTab();
+  }
+
+  el.innerHTML = html;
+
+  // ── Post-render setup ─────────────────────────────────────────────────────
+  if (!DS.job && !DS.blankMode) {
+    dbLoadJobs();
+  }
+  if (DS.tab === 'estimate') { recalcEst(); }
+  if (DS.tab === 'workorder') { recalcWO(); }
+  if (DS.tab === 'matorder') { recalcMO(); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOB LOADING
+// ─────────────────────────────────────────────────────────────────────────────
+async function dbLoadJobs() {
+  const sel = document.getElementById('db-job-dropdown');
+  const status = document.getElementById('db-job-status');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">⏳ Loading jobs from JobNimbus...</option>';
+  if (status) status.textContent = '';
+
+  try {
+    // Load from our claims entity (synced from JN)
+    const r = await callFunction('entityFetch', { entity: 'Claim', action: 'list' });
+    const claims = (r.records || []).filter(c => c.insured_name || c.address);
+
+    // Sort alphabetically by insured_name or address
+    claims.sort((a, b) => {
+      const na = (a.insured_name || a.address || '').toLowerCase();
+      const nb = (b.insured_name || b.address || '').toLowerCase();
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    });
+
+    if (!claims.length) {
+      sel.innerHTML = '<option value="">No jobs found</option>';
+      if (status) status.textContent = 'No jobs found. Sync from JobNimbus first.';
+      return;
+    }
+
+    const opts = ['<option value="">-- Select a Job --</option>'];
+    claims.forEach(c => {
+      const label = `${c.insured_name || 'Unknown'} — ${c.address || ''}${c.city ? ', '+c.city : ''} ${c.job_number ? '#'+c.job_number : ''}`.trim();
+      opts.push(`<option value="${c.id}">${label}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+
+    if (status) status.textContent = `${claims.length} jobs loaded. Select one above.`;
+
+    // If preload ID set, auto-select it
+    if (window._dbState && window._dbState.preloadJobId) {
+      sel.value = window._dbState.preloadJobId;
+      if (sel.value) dbSelectJob(window._dbState.preloadJobId);
+    }
+
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading jobs</option>';
+    if (status) status.innerHTML = '<span style="color:var(--red)">&#x274C; '+e.message+'</span>';
+  }
+}
+
+async function dbSelectJob(id) {
+  if (!id) return;
+  const status = document.getElementById('db-job-status');
+  if (status) status.innerHTML = '<span>&#x23F3; Loading job details...</span>';
+
+  try {
+    const r = await callFunction('entityFetch', { entity: 'Claim', action: 'get', id });
+    const claim = r.record || {};
+
+    window._dbState.job = claim;
+    window._dbState.blankMode = false;
+    window._dbState.tab = window._dbState.tab || 'estimate';
+
+    // Pre-populate doc state from claim
+    window._dbState.jobName = claim.insured_name || '';
+    window._dbState.jobAddr = claim.address || '';
+    window._dbState.jobNum  = claim.job_number || '';
+    window._dbState.carrier = claim.carrier || '';
+    window._dbState.claimNum = claim.claim_number || '';
+    window._dbState.adjEmail = claim.adjuster_email || '';
+    window._dbState.adjName  = claim.adjuster_name || '';
+    window._dbState.dol      = claim.date_of_loss || '';
+
+    renderDBInner();
+  } catch(e) {
+    if (status) status.innerHTML = '<span style="color:var(--red)">&#x274C; '+e.message+'</span>';
+  }
+}
+
+function dbUseBlankJob() {
+  window._dbState.job = null;
+  window._dbState.blankMode = true;
+  window._dbState.tab = 'estimate';
+  window._dbState.jobName = '';
+  window._dbState.jobAddr = '';
+  window._dbState.jobNum  = '';
+  renderDBInner();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS: get current job field values
+// ─────────────────────────────────────────────────────────────────────────────
+function dbField(id, fallback) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : (fallback || '');
+}
+
+function dbJobHeader() {
+  const DS = window._dbState || {};
+  const j = DS.job || {};
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    owner:    DS.jobName || j.insured_name || '',
+    addr:     DS.jobAddr || j.address || '',
+    jobNum:   DS.jobNum  || j.job_number || '',
+    date:     today,
+    carrier:  DS.carrier || j.carrier || '',
+    claimNum: DS.claimNum || j.claim_number || '',
+    adjName:  DS.adjName  || j.adjuster_name || '',
+    adjEmail: DS.adjEmail || j.adjuster_email || '',
+    dol:      DS.dol      || j.date_of_loss || '',
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTIMATE TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function buildEstimateTab() {
+  const DS = window._dbState || {};
+  const h = dbJobHeader();
+  const today = new Date().toISOString().slice(0, 10);
+  const carriers = ['American Family','Allstate','State Farm','Travelers','Hartford',
+    'Shelter Insurance','Progressive','USAA','Farmers','Liberty Mutual','Nationwide','Chubb',
+    'Hippo','Openly','Homesite','Cincinnati Financial','West Bend','Pekin Insurance','Other'];
+  const docTypes = ['Insurance Supplement','Insurance Estimate','Customer Quote',
+    'Re-Roof Proposal','Partial Repair Estimate','Gutter Only','Siding Only','Multi-Trade Full Exterior'];
+
+  const lines = DS.lines || [];
+
+  return `
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;gap:10px">
+      <div class="card-title">&#x1F4CB; Estimate / Supplement</div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="printEstimate()">&#x1F5A8; Print/PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyEstimateText()">&#x1F4CB; Copy Text</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearEstimate()">&#x1F5D1; Clear</button>
       </div>
     </div>
     <div class="card-body" style="padding:20px 24px">
 
-      <!-- ── JOB INFO ─────────────────────────────────────────── -->
+      <!-- JOB INFO (pre-populated from job selection) -->
       <div class="db-sec">&#x1F3E0; Job Information</div>
       <div class="fgrid" style="margin-bottom:4px">
         <div class="fg">
           <label>Homeowner Name</label>
-          <input id="est-owner" placeholder="First Last"/>
+          <input id="est-owner" value="${h.owner}" placeholder="First Last"/>
         </div>
         <div class="fg span2">
           <label>Property Address</label>
-          <input id="est-addr" placeholder="123 Main St, St. Louis MO 63110"/>
+          <input id="est-addr" value="${h.addr}" placeholder="123 Main St, St. Louis MO 63110"/>
         </div>
         <div class="fg">
-          <label>Estimate #</label>
-          <input id="est-num" placeholder="3109"/>
+          <label>Doc Type</label>
+          <select id="est-doctype">
+            ${docTypes.map(t=>`<option value="${t}"${t==='Insurance Supplement'?' selected':''}>${t}</option>`).join('')}
+          </select>
         </div>
         <div class="fg">
-          <label>Job # (JN)</label>
-          <input id="est-job" placeholder="4990"/>
+          <label>Estimate # (auto)</label>
+          <input id="est-num" value="${h.jobNum ? 'EST-'+h.jobNum : ''}" placeholder="EST-4990"/>
         </div>
         <div class="fg">
           <label>Date</label>
-          <input type="date" id="est-date" value="${new Date().toISOString().slice(0,10)}"/>
+          <input type="date" id="est-date" value="${today}"/>
         </div>
       </div>
 
-      <!-- ── INSURANCE INFO ─────────────────────────────────────── -->
+      <!-- INSURANCE INFO -->
       <div class="db-sec">&#x1F6E1; Insurance / Claim</div>
       <div class="fgrid" style="margin-bottom:4px">
         <div class="fg">
           <label>Insurance Carrier</label>
           <select id="est-carrier">
             <option value="">-- Select --</option>
-            ${['American Family','Allstate','State Farm','Travelers','Hartford',
-               'Shelter Insurance','Progressive','USAA','Farmers','Liberty Mutual',
-               'Nationwide','Auto-Owners','Missouri Farm Bureau','Other / Out-of-Pocket']
-              .map(c=>`<option>${c}</option>`).join('')}
+            ${carriers.map(c=>`<option value="${c}"${c===h.carrier?' selected':''}>${c}</option>`).join('')}
           </select>
         </div>
         <div class="fg">
           <label>Claim Number</label>
-          <input id="est-claim" placeholder="Claim #"/>
-        </div>
-        <div class="fg">
-          <label>Type of Loss</label>
-          <select id="est-loss">
-            <option>Wind and Hail</option>
-            <option>Wind Only</option><option>Hail Only</option>
-            <option>Storm Damage</option><option>Water Damage</option>
-            <option>Fire / Smoke</option><option>Retail / Out-of-Pocket</option>
-          </select>
+          <input id="est-claim" value="${h.claimNum}" placeholder="CL-2024-XXXXXX"/>
         </div>
         <div class="fg">
           <label>Date of Loss</label>
-          <input type="date" id="est-dol"/>
+          <input type="date" id="est-dol" value="${h.dol}"/>
         </div>
         <div class="fg">
           <label>Adjuster Name</label>
-          <input id="est-adjuster" placeholder="Adjuster name"/>
+          <input id="est-adj" value="${h.adjName}" placeholder="John Smith"/>
         </div>
         <div class="fg">
-          <label>Carrier RCV Offered</label>
-          <input id="est-carrier-rcv" type="number" step="0.01" placeholder="0.00"/>
+          <label>Adjuster Email</label>
+          <input id="est-adjemail" value="${h.adjEmail}" placeholder="adj@carrier.com"/>
+        </div>
+        <div class="fg">
+          <label>O&amp;P Rate</label>
+          <select id="est-ohp">
+            <option value="5">5% / 5% (Roof Only)</option>
+            <option value="10">10% / 10% (Full Exterior)</option>
+          </select>
         </div>
       </div>
 
-      <!-- ── GAF TEMPLATE PICKER ───────────────────────────────── -->
-      <div class="db-sec">&#x1F3D7;&#xFE0F; Load Shingle System Template</div>
+      <!-- QUICK SCOPE AUTO-BUILDER -->
+      <div class="db-sec">&#x26A1; Quick Scope Auto-Builder</div>
       <div class="tpl-banner">
-        <div class="tpl-icon">&#x1F3D7;&#xFE0F;</div>
-        <div class="tpl-label">
-          <strong>Shingle Templates</strong>
-          <div>Auto-fills all line items &mdash; STL 2026 pricing &mdash; fully editable</div>
-        </div>
-        <select id="gaf-tpl-sel" class="tpl-sel"
-          onchange="loadGAFTemplate(this.value);this.value=''"
-          title="Select a system to load line items">
-          <option value="">&#x2193; Choose a shingle system...</option>
-          <optgroup label="&#x1F7E2; GAF Timberline HDZ — High Definition Colors">
-            <option value="hdz_ww">&#x1F7E4; Weathered Wood  &#x2605; Most Popular</option>
-            <option value="hdz_charcoal">&#x2B1B; Charcoal</option>
-            <option value="hdz_pewter">&#x1FA76; Pewter Gray</option>
-            <option value="hdz_slate">&#x1FAA8; Slate</option>
-            <option value="hdz_barkwood">&#x1F332; Barkwood</option>
-            <option value="hdz_hickory">&#x1F342; Hickory</option>
-            <option value="hdz_shakewood">&#x1FAB5; Shakewood</option>
-            <option value="hdz_missionbrown">&#x1F7EB; Mission Brown</option>
-            <option value="hdz_insurance">&#x1F4CB; Full Insurance Scope (All Supplements Pre-Loaded)</option>
-          </optgroup>
-          <optgroup label="&#x1F535; GAF Timberline HDZ — Bold Definition Colors">
-            <option value="bd_chestnut">&#x1F7EB; Chestnut Valley</option>
-            <option value="bd_midnight">&#x1F311; Midnight Mesa</option>
-            <option value="bd_cliffside">&#x26F0;&#xFE0F; Cliffside</option>
-            <option value="bd_sierra">&#x1F3DC;&#xFE0F; Sierra Sand</option>
-          </optgroup>
-          <optgroup label="&#x25AA;&#xFE0F; Flat / Low Slope">
-            <option value="flatroof_modbit">Modified Bitumen Torch-Down System</option>
-          </optgroup>
-        </select>
-        <button class="tpl-clr"
-          onclick="if(!estLines.length||confirm('Clear all '+estLines.length+' line items?')){estLines=[];renderEstLines();}">
-          &#x1F5D1; Clear Items
-        </button>
-      </div>
-      <div class="tpl-note">
-        &#x1F4A1; Default qty = <strong>35 SQ</strong> — always update to your field measurements before printing.
-        STL 2026 higher-end supplier pricing. All items are fully editable.
+        <span style="font-size:12px;font-weight:700;color:var(--text2)">GAF Templates:</span>
+        <button class="tpl-btn" onclick="loadGAFTemplate('hdz')">HDZ Shingle Full</button>
+        <button class="tpl-btn" onclick="loadGAFTemplate('cs')">Camelot II CS</button>
+        <button class="tpl-btn" onclick="loadGAFTemplate('redeckonly')">Redeck Only</button>
+        <button class="tpl-btn" onclick="loadGAFTemplate('gutters')">Gutters Only</button>
+        <button class="tpl-btn" onclick="loadGAFTemplate('supplement')">Supplement Add-ons</button>
+        <button class="tpl-btn" onclick="loadGAFTemplate('flat')">Flat/Mod-Bit</button>
       </div>
 
-      <!-- ── QUICK ADD ───────────────────────────────────────────── -->
-      <div class="db-sec">&#x2795; Quick Add Line Item</div>
-      <div class="qa-card">
-        <div class="qa-row">
-          <div class="qa-f">
-            <label>Trade</label>
-            <select id="qa-trade" onchange="updateQATrade()">
-              <option value="roofing_shingles">Roofing — Shingles</option>
-              <option value="roofing_underlayment">Roofing — Underlayment</option>
-              <option value="roofing_icewater">Roofing — Ice &amp; Water</option>
-              <option value="roofing_ridge">Roofing — Ridge Cap</option>
-              <option value="roofing_starter">Roofing — Starter Strip</option>
-              <option value="roofing_ventilation">Roofing — Ventilation</option>
-              <option value="roofing_flashing">Roofing — Flashing</option>
-              <option value="roofing_decking">Roofing — Decking</option>
-              <option value="roofing_flatroof">Roofing — Flat Roof</option>
-              <option value="roofing_labor">Roofing — Labor</option>
-              <option value="gutters">Gutters &amp; Downspouts</option>
-              <option value="siding">Siding &amp; Accessories</option>
-              <option value="windows">Windows</option>
-              <option value="doors">Doors</option>
-              <option value="labor_gutters">Labor — Gutters</option>
-              <option value="labor_siding">Labor — Siding</option>
-              <option value="labor_windows">Labor — Windows</option>
-            </select>
-          </div>
-          <div class="qa-f">
-            <label>Product</label>
-            <select id="qa-product" onchange="updateQAProduct()"></select>
-          </div>
-          <div class="qa-f">
-            <label>Description</label>
-            <input id="qa-desc" placeholder="Auto-filled or type"
-              onkeydown="if(event.key==='Enter')document.getElementById('qa-price').focus()"/>
-          </div>
-          <div class="qa-f">
-            <label>Unit Price</label>
-            <input id="qa-price" type="number" step="0.01" placeholder="0.00"
-              onkeydown="if(event.key==='Enter')document.getElementById('qa-qty').focus()"/>
-          </div>
-          <div class="qa-f">
-            <label>Qty</label>
-            <input id="qa-qty" type="number" step="0.01" placeholder="1"
-              onkeydown="if(event.key==='Enter')addLineToEstimate()"/>
-          </div>
-          <div class="qa-f">
-            <label style="opacity:0">Add</label>
-            <button class="qa-add" onclick="addLineToEstimate()" title="Add line (Enter in Qty)">&#xFF0B;</button>
-          </div>
+      <!-- LINE ITEMS -->
+      <div class="db-sec">&#x1F4B0; Scope of Work — Line Items</div>
+
+      <!-- Quick Add Row -->
+      <div style="display:grid;grid-template-columns:2fr 1fr 70px 90px 90px auto;gap:8px;align-items:end;margin-bottom:12px;background:var(--surface2);padding:12px;border-radius:10px;border:1px solid var(--border)">
+        <div class="fg">
+          <label>Trade / Category</label>
+          <select id="qa-trade" onchange="updateQATrade()">
+            <option value="roofing_shingles">Roofing — Shingles</option>
+            <option value="roofing_underlayment">Roofing — Underlayment</option>
+            <option value="roofing_icewater">Roofing — Ice &amp; Water Shield</option>
+            <option value="roofing_ridge">Roofing — Ridge Cap</option>
+            <option value="roofing_starter">Roofing — Starter Strip</option>
+            <option value="roofing_ventilation">Roofing — Ventilation</option>
+            <option value="roofing_flashing">Roofing — Flashing</option>
+            <option value="roofing_drip_edge">Roofing — Drip Edge</option>
+            <option value="decking">Decking / Plywood</option>
+            <option value="gutters">Gutters / Gutter Helmet</option>
+            <option value="labor_roofing">Labor — Roofing</option>
+            <option value="flat_roof">Flat Roof (EPDM/TPO/Mod-Bit)</option>
+            <option value="siding">Siding</option>
+            <option value="windows">Windows</option>
+            <option value="doors">Doors</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Product</label>
+          <select id="qa-product" onchange="updateQAProduct()"></select>
+        </div>
+        <div class="fg">
+          <label>Qty</label>
+          <input type="number" id="qa-qty" value="1" min="0.01" step="0.01"/>
+        </div>
+        <div class="fg">
+          <label>Unit</label>
+          <input id="qa-unit" value="SQ" placeholder="SQ"/>
+        </div>
+        <div class="fg">
+          <label>Price/Unit</label>
+          <input type="number" id="qa-price" value="0" step="0.01"/>
+        </div>
+        <div class="fg">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary btn-sm" onclick="addQALine()" style="white-space:nowrap">&#x2795; Add</button>
         </div>
       </div>
 
-      <!-- ── LINE ITEMS TABLE ─────────────────────────────────── -->
-      <div class="db-sec" id="li-section-label">
-        &#x1F4C4; Line Items
-        <span id="li-mode-badge" style="font-size:9px;background:rgba(30,111,255,.12);
-          color:var(--primary);padding:2px 8px;border-radius:10px;margin-left:4px;font-weight:700">
-          ESTIMATE VIEW
-        </span>
+      <!-- Line items table -->
+      <div id="est-lines-wrap">
+        ${renderEstLines()}
       </div>
-      <div class="li-wrap">
-        <div class="li-hdr li-hdr-est" id="li-header">
-          <span>#</span>
-          <span>Description (Xactimate)</span>
-          <span style="text-align:center">Qty</span>
-          <span style="text-align:center">Unit</span>
-          <span style="text-align:right">Unit Price</span>
-          <span style="text-align:right">Total</span>
-          <span></span>
-        </div>
-        <div id="est-lines">
-          <div class="li-empty">
-            <div class="li-empty-icon">&#x1F4C4;</div>
-            <p style="font-size:13px;margin:0">No line items yet — pick a template above or use Quick Add</p>
-          </div>
-        </div>
-        <div class="li-foot">
-          <span id="li-count-label" style="font-size:11.5px;color:var(--text2);font-weight:600">0 items</span>
-          <button style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;
-            border-radius:7px;border:1.5px dashed var(--primary);background:transparent;
-            color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;"
-            onclick="addBlankLine()">&#xFF0B; Blank Line</button>
+
+      <!-- Totals + actions -->
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <div class="totals-box" id="est-totals">
+          <div class="tr"><span>Subtotal</span><span id="et-sub">--</span></div>
+          <div class="tr"><span id="et-oh-lbl">Overhead (5%)</span><span id="et-oh">--</span></div>
+          <div class="tr"><span id="et-pr-lbl">Profit (5%)</span><span id="et-pr">--</span></div>
+          <div class="tr"><span>Tax (9.679%)</span><span id="et-tax">--</span></div>
+          <div class="tr bold green"><span>&#x1F4B0; Total RCV</span><span id="et-total">--</span></div>
         </div>
       </div>
 
-      <!-- ── TOTALS + O&P ───────────────────────────────────────── -->
-      <div class="tots-layout">
-
-        <!-- Left: O&P controls -->
-        <div class="op-panel">
-          <div class="op-tit">&#x2699;&#xFE0F; Overhead &amp; Profit Settings</div>
-          <div class="op-row">
-            <input type="checkbox" id="op-include-overhead" class="op-chk" checked onchange="recalcEst()">
-            <label for="op-include-overhead" class="op-lbl">Include Overhead</label>
-            <input type="number" id="op-overhead-pct" class="op-pct" value="10" min="0" max="50" step="0.5" oninput="recalcEst()">
-            <span class="op-sym">%</span>
-          </div>
-          <div class="op-row">
-            <input type="checkbox" id="op-include-profit" class="op-chk" checked onchange="recalcEst()">
-            <label for="op-include-profit" class="op-lbl">Include Profit</label>
-            <input type="number" id="op-profit-pct" class="op-pct" value="10" min="0" max="50" step="0.5" oninput="recalcEst()">
-            <span class="op-sym">%</span>
-          </div>
-          <div class="op-note">
-            <strong>&#x1F3E0; Roof-only:</strong> 5% / 5%<br>
-            <strong>&#x1F6A7; Full exterior multi-trade:</strong> 10% / 10%<br>
-            <span style="opacity:.75">Per Cox Roofing standard O&amp;P policy</span>
-          </div>
-        </div>
-
-        <!-- Right: Totals + Export -->
-        <div>
-          <div class="tots-card">
-            <div class="tots-r">
-              <span class="tl">Subtotal (Materials + Labor)</span>
-              <span class="ta" id="est-subtotal">$0.00</span>
-            </div>
-            <div class="tots-r" id="est-overhead-row">
-              <span class="tl" id="est-overhead-lbl">Overhead (10%)</span>
-              <span class="ta" id="est-overhead">$0.00</span>
-            </div>
-            <div class="tots-r" id="est-profit-row">
-              <span class="tl" id="est-profit-lbl">Profit (10%)</span>
-              <span class="ta" id="est-profit">$0.00</span>
-            </div>
-            <div class="tots-r">
-              <span class="tl">Material Sales Tax (9.679%)</span>
-              <span class="ta" id="est-tax">$0.00</span>
-            </div>
-            <div class="tots-grand">
-              <span class="tl">TOTAL RCV</span>
-              <span class="ta" id="est-grand">$0.00</span>
-            </div>
-          </div>
-          <div class="exp-btns">
-            <button class="btn-exp btn-est" onclick="printEstimate()"
-              title="Print/PDF with Xactimate codes and full justification notes">
-              &#x1F5A8;&#xFE0F; Print Estimate / Supplement
-            </button>
-            <button class="btn-exp btn-mo" onclick="printEstimateMOView()"
-              title="Print brand-name material list for supplier (no Xactimate codes)">
-              &#x1F4E6; Print Material Order View
-            </button>
-          </div>
-          <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap">
-            <button class="btn-exp btn-copy" onclick="copyEstimateText(false)"
-              style="font-size:12px;padding:7px 14px">
-              &#x1F4CB; Copy Estimate Text
-            </button>
-            <button class="btn-exp btn-copy" onclick="copyEstimateText(true)"
-              style="font-size:12px;padding:7px 14px">
-              &#x1F4E6; Copy MO Text
-            </button>
-          </div>
-        </div>
+      <div class="db-actions">
+        <button class="btn btn-primary" onclick="addBlankLine()">&#x2795; Add Line</button>
+        <button class="btn btn-ghost" onclick="clearEstimate()">&#x1F5D1; Clear All</button>
+        <button class="btn btn-ghost" onclick="printEstimate()">&#x1F5A8; Print / Export PDF</button>
+        <button class="btn btn-ghost" onclick="copyEstimateText()">&#x1F4CB; Copy to Clipboard</button>
+        <div id="est-save-status" style="font-size:12px;color:var(--text2)"></div>
       </div>
 
-    </div><!-- /card-body -->
-  </div><!-- /card -->
-  </div><!-- /panel-estimate -->
+    </div>
+  </div>`;
+}
 
-  <!-- ═══ MATERIAL ORDER PANEL ══════════════════════════════════════════════ -->
-  <div class="doc-panel" id="panel-matorder">
-    <div id="mo-panel-inner"></div>
-  </div>
+// ─────────────────────────────────────────────────────────────────────────────
+// MATERIAL ORDER TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function buildMaterialOrderTab() {
+  const DS = window._dbState || {};
+  const h = dbJobHeader();
+  const today = new Date().toISOString().slice(0, 10);
+  const moN = String((DS.moCounter || 1)).padStart(4, '0');
 
-  <!-- ═══ WORK ORDER PANEL ══════════════════════════════════════════════════ -->
-  <div class="doc-panel" id="panel-workorder">
-    <div id="wo-panel-inner"></div>
-  </div>
+  // Merge with existing buildMOPanel logic
+  const moPanel = (typeof buildMOPanel === 'function') ? buildMOPanel() : '<p class="text-muted">Material Order builder loading...</p>';
 
-  <!-- ═══ CATALOG PANEL ════════════════════════════════════════════════════ -->
-  <div class="doc-panel" id="panel-catalog">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <input class="form-input" id="cat-search" placeholder="&#x1F50D; Search products, brands, colors..."
-        style="max-width:300px" oninput="filterCatalog()"/>
-      <div style="display:flex;gap:5px;flex-wrap:wrap" id="cat-filters">
-        ${['All','Shingles','Underlayment','Ice & Water','Ridge','Starter','Ventilation',
-           'Flashing','Decking','Flat Roof','Gutters','Siding','Windows','Doors','Labor'].map((f,i)=>`
-          <span style="padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:600;
-            cursor:pointer;transition:all .15s;
-            background:${i===0?'var(--primary)':'var(--surface2)'};
-            color:${i===0?'#fff':'var(--text2)'};border:1px solid ${i===0?'var(--primary)':'var(--border)'}"
-            onclick="setCatFilter(this,'${f}')">${f}</span>`).join('')}
+  return `
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;gap:10px">
+      <div class="card-title">&#x1F9F1; Material Order</div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="printMO()">&#x1F5A8; Print/PDF</button>
       </div>
     </div>
-    <div id="catalog-grid-container"></div>
-  </div>
-  `;
-
-  // Init everything
-  window._estMode = 'estimate';
-  updateQATrade();
-  updateMOTrade();
-  loadDefaultWOLines();
-  loadCatalogGrid('All');
+    <div class="card-body" style="padding:20px 24px">
+      <div class="db-sec">&#x1F3E0; Job Information</div>
+      <div class="fgrid" style="margin-bottom:16px">
+        <div class="fg">
+          <label>Homeowner</label>
+          <input id="mo-owner" value="${h.owner}" placeholder="First Last"/>
+        </div>
+        <div class="fg span2">
+          <label>Property Address</label>
+          <input id="mo-addr" value="${h.addr}" placeholder="123 Main St"/>
+        </div>
+        <div class="fg">
+          <label>Material Order #</label>
+          <input id="mo-num" value="MO-${h.jobNum || moN}" placeholder="MO-4990"/>
+        </div>
+        <div class="fg">
+          <label>Job # (JN)</label>
+          <input id="mo-job" value="${h.jobNum}" placeholder="4990"/>
+        </div>
+        <div class="fg">
+          <label>Delivery Date</label>
+          <input type="date" id="mo-date" value="${today}"/>
+        </div>
+        <div class="fg span3">
+          <label>Delivery Notes</label>
+          <textarea id="mo-notes" placeholder="Leave in driveway, call 30 min ahead..."></textarea>
+        </div>
+      </div>
+      <div id="panel-matorder">
+        ${moPanel}
+      </div>
+    </div>
+  </div>`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORK ORDER TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function buildWorkOrderTab() {
+  const DS = window._dbState || {};
+  const h = dbJobHeader();
+  const today = new Date().toISOString().slice(0, 10);
+  const woN = String((DS.woCounter || 1)).padStart(4, '0');
+
+  // Include buildWOPanel if available
+  const woPanel = (typeof buildWOPanel === 'function') ? buildWOPanel() : '<p class="text-muted">Work Order builder loading...</p>';
+
+  return `
+  <div class="card">
+    <div class="card-header" style="display:flex;align-items:center;gap:10px">
+      <div class="card-title">&#x1F528; Work Order</div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="printWO()">&#x1F5A8; Print/PDF</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:20px 24px">
+      <div class="db-sec">&#x1F3E0; Job Information</div>
+      <div class="fgrid" style="margin-bottom:16px">
+        <div class="fg">
+          <label>Homeowner</label>
+          <input id="wo-owner" value="${h.owner}" placeholder="First Last"/>
+        </div>
+        <div class="fg span2">
+          <label>Property Address</label>
+          <input id="wo-addr" value="${h.addr}" placeholder="123 Main St"/>
+        </div>
+        <div class="fg">
+          <label>Work Order #</label>
+          <input id="wo-num" value="WO-${h.jobNum || woN}" placeholder="WO-4990"/>
+        </div>
+        <div class="fg">
+          <label>Job # (JN)</label>
+          <input id="wo-job" value="${h.jobNum}" placeholder="4990"/>
+        </div>
+        <div class="fg">
+          <label>Work Date</label>
+          <input type="date" id="wo-date" value="${today}"/>
+        </div>
+        <div class="fg">
+          <label>Crew / Contractor</label>
+          <input id="wo-crew" placeholder="Crew name / sub name"/>
+        </div>
+        <div class="fg">
+          <label>Insurance Carrier</label>
+          <input id="wo-carrier" value="${h.carrier}" placeholder="State Farm"/>
+        </div>
+        <div class="fg">
+          <label>Claim Number</label>
+          <input id="wo-claim" value="${h.claimNum}" placeholder="CL-2024-XXXXXX"/>
+        </div>
+        <div class="fg span3">
+          <label>Special Instructions</label>
+          <textarea id="wo-notes" placeholder="Access code: 1234. Careful around back fence. Contact homeowner before starting..."></textarea>
+        </div>
+      </div>
+      <div id="panel-workorder">
+        ${woPanel}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ESTIMATE HELPERS (keep existing recalcEst, addBlankLine, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+function addQALine() {
+  const trade = document.getElementById('qa-trade');
+  const product = document.getElementById('qa-product');
+  const qty = parseFloat(document.getElementById('qa-qty').value) || 1;
+  const unit = document.getElementById('qa-unit').value || 'EA';
+  const price = parseFloat(document.getElementById('qa-price').value) || 0;
+  const xCodeMap = {
+    roofing_shingles:'RFG300S',roofing_underlayment:'RFG240',roofing_icewater:'RFG260',
+    roofing_ridge:'RFG180',roofing_starter:'RFG170',roofing_ventilation:'RFG330',
+    roofing_flashing:'RFG290',roofing_drip_edge:'RFG130',decking:'FRM220',
+    gutters:'GUT200',labor_roofing:'RFG',flat_roof:'RFG500',siding:'SID100',
+    windows:'WIN100',doors:'DOR100'
+  };
+  const xCode = xCodeMap[trade ? trade.value : ''] || '';
+  const desc = (product && product.value) ? product.value : (trade ? trade.options[trade.selectedIndex].text : 'Item');
+  addLineToEstimate({ trade: trade ? trade.options[trade.selectedIndex].text : '', desc, qty, unit, price, xCode, notes: '' });
+}
+
+function recalcWO() { /* WO totals handled inside buildWOPanel */ }
+function recalcMO() { /* MO totals handled inside buildMOPanel */ }
 
 // ─── MODE TOGGLE (Estimate View vs Material Order View) ──────────────────────
 function setEstMode(mode) {
@@ -5729,6 +5801,7 @@ function copyEstimateText(asMO) {
   }
   navigator.clipboard.writeText(text).then(() => showToast('\u2705 Copied to clipboard!', 'success'));
 }
+
 
 </script>
 
@@ -8107,7 +8180,7 @@ function showInvitePanel(token){
         style="width:100%;padding:12px 14px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:14px;outline:none;margin-bottom:20px;font-family:inherit;box-sizing:border-box;"
         onfocus="this.style.borderColor='#1345A8';this.style.boxShadow='0 0 0 3px rgba(19,69,168,.10)'"
         onblur="this.style.borderColor='#E2E8F0';this.style.boxShadow='none'">
-      <button onclick="submitInviteScreen()" id="is-btn"
+      <button onclick="submitInvitePanel()" id="is-btn"
         style="width:100%;padding:14px;background:linear-gradient(135deg,#15803D,#14532D);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(21,128,61,0.30);font-family:inherit;letter-spacing:.01em;margin-bottom:4px;">
         Create Account &#x2192;
       </button>
@@ -8177,7 +8250,7 @@ async function submitInvitePanel(){
         if(r.user){ state.user=r.user; localStorage.setItem('cd_user', JSON.stringify(r.user)); }
         // Remove invite screen and load app
         const ls=document.getElementById('login-screen'); if(ls) ls.remove();
-        initApp();
+        loadDashboard();
       }, 1200);
     } else {
       msgEl.style.color='#B22234';
