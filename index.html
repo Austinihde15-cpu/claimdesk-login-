@@ -2470,21 +2470,21 @@ function renderPipelinePage() {
 //  CLAIM DETAIL
 // ===========================================================
 async function openClaimDetail(id) {
-  document.getElementById('content').innerHTML = `<div class="empty-state"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto"></div><p style="margin-top:12px;color:var(--text2)">Loading claim...</p></div>`;
+  document.getElementById('content').innerHTML = '<div class="empty-state"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto"></div><p style="margin-top:12px;color:var(--text2)">Loading claim...</p></div>';
   try {
-    const data = await callFunction('getAppData', { page: 'claim_detail', claim_id: id, user_email: state.user?.email, is_admin: state.user?.role === 'admin' });
-    if (!data || !data.ok) throw new Error(data?.error || 'Server returned an error');
+    const data = await callFunction('getAppData', { page: 'claim_detail', claim_id: id, user_email: state.user ? state.user.email : '', is_admin: state.user ? state.user.role === 'admin' : false });
+    if (!data || !data.ok) throw new Error(data ? (data.error || 'Server error') : 'No response from server');
     state.currentClaimData = data;
     const c = data.claim;
     if (!c) {
-      document.getElementById('content').innerHTML = `<div class="empty-state"><p style="color:var(--red);margin-bottom:12px">&#x26A0; Claim not found — it may have been deleted.</p><button class="btn btn-ghost" onclick="goto('claims')">&#x2190; Back to Claims</button></div>`;
+      document.getElementById('content').innerHTML = '<div class="empty-state"><p style="color:var(--red);margin-bottom:12px">&#x26A0; Claim not found.</p><button class="btn btn-ghost" onclick="goto(\'claims\')">&#x2190; Back to Claims</button></div>';
       return;
     }
     state.currentClaim = c;
     document.getElementById('topbar-title').textContent = (c.insured_name || 'Claim') + ' #' + (c.job_number || '');
     renderClaimDetail(data);
   } catch(e) {
-    document.getElementById('content').innerHTML = `<div class="empty-state"><p style="color:var(--red);margin-bottom:12px">&#x274C; Failed to load claim: \${e.message}</p><button class="btn btn-primary btn-sm" onclick="openClaimDetail('\${id}')">&#x21BA; Retry</button>&nbsp;<button class="btn btn-ghost btn-sm" onclick="goto('claims')">&#x2190; Back</button></div>`;
+    document.getElementById('content').innerHTML = '<div class="empty-state"><p style="color:var(--red);margin-bottom:12px">&#x274C; Failed to load claim: ' + e.message + '</p><button class="btn btn-primary btn-sm" onclick="openClaimDetail(\'' + id + '\')">&#x21BA; Retry</button> <button class="btn btn-ghost btn-sm" onclick="goto(\'claims\')">&#x2190; Back</button></div>';
   }
 }
 
