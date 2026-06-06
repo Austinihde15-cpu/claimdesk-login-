@@ -4600,53 +4600,229 @@ function getCatalogItems(tradeKey) {
 function renderDocBuilderPage() {
   document.getElementById('content').innerHTML = `
   <style>
-    .db-tabs{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
-    .db-tab{padding:9px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
-            background:var(--navy3);color:var(--text2);border:1px solid var(--border);transition:all .15s}
-    .db-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    /* ═══ DOC BUILDER — REDESIGN 2026 ═══════════════════════════════════ */
+
+    /* Tab bar */
+    .db-tabs{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap;padding:4px;
+             background:var(--navy3);border-radius:12px;border:1px solid var(--border)}
+    .db-tab{padding:9px 22px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;
+            color:var(--text2);border:none;background:transparent;transition:all .2s;letter-spacing:.01em}
+    .db-tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 10px rgba(30,111,255,.28)}
     .db-tab:hover:not(.active){background:var(--card2);color:var(--text)}
-    .doc-panel{display:none} .doc-panel.active{display:block}
-    .doc-header-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
-    @media(max-width:700px){.doc-header-form{grid-template-columns:1fr 1fr}}
-    .line-item-row{display:grid;grid-template-columns:1fr 70px 80px 90px 80px 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
-    .line-item-row:last-child{border-bottom:none}
-    .line-item-header{display:grid;grid-template-columns:1fr 70px 80px 90px 80px 36px;gap:8px;padding:6px 0 8px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;border-bottom:2px solid var(--border);margin-bottom:4px}
-    .input-sm{width:100%;padding:5px 8px;background:var(--navy3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none}
-    .input-sm:focus{border-color:var(--blue)} select.input-sm{cursor:pointer}
-    .totals-box{background:var(--navy3);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-top:16px}
-    .totals-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;border-bottom:1px solid var(--border)}
-    .totals-row:last-child{border-bottom:none;font-size:15px;font-weight:800;color:var(--green)}
-    .totals-row .label{color:var(--text2)} .totals-row .val{font-weight:600}
-    .add-line-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:7px;border:1px dashed var(--blue);background:transparent;color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px}
-    .add-line-btn:hover{background:rgba(30,111,255,.08)}
+
+    .doc-panel{display:none}
+    .doc-panel.active{display:block}
+
+    /* Section headings */
+    .db-section-label{font-size:10.5px;font-weight:800;color:var(--text2);text-transform:uppercase;
+                      letter-spacing:.1em;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .db-section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* Header info grid */
+    .est-header-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    @media(max-width:800px){.est-header-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:520px){.est-header-grid{grid-template-columns:1fr}}
+    .est-field label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;
+                     letter-spacing:.06em;display:block;margin-bottom:5px}
+    .est-field input,.est-field select{
+      width:100%;padding:9px 12px;
+      background:var(--navy3);border:1.5px solid var(--border);
+      border-radius:9px;color:var(--text);font-size:13px;outline:none;
+      transition:border-color .15s,box-shadow .15s;box-sizing:border-box}
+    .est-field input:focus,.est-field select:focus{
+      border-color:var(--blue);box-shadow:0 0 0 3px rgba(30,111,255,.12)}
+
+    /* Template banner */
+    .tpl-banner{
+      display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+      padding:14px 18px;
+      background:linear-gradient(135deg,rgba(30,111,255,.08) 0%,rgba(30,111,255,.02) 100%);
+      border:1.5px solid rgba(30,111,255,.22);border-radius:12px;margin-bottom:20px}
+    .tpl-icon{font-size:22px;line-height:1;flex-shrink:0}
+    .tpl-meta{flex:1;min-width:0}
+    .tpl-meta strong{font-size:13px;font-weight:800;color:var(--text);display:block;margin-bottom:2px}
+    .tpl-meta span{font-size:11.5px;color:var(--text2)}
+    .tpl-select{
+      flex:1;min-width:200px;max-width:380px;
+      padding:9px 14px;background:var(--card);border:1.5px solid var(--border);
+      border-radius:9px;color:var(--text);font-size:13px;font-weight:600;outline:none;cursor:pointer;
+      transition:border-color .15s}
+    .tpl-select:focus{border-color:var(--blue)}
+    .tpl-clear-btn{
+      padding:8px 16px;border-radius:9px;border:1.5px solid var(--border);
+      background:var(--navy3);color:var(--text2);font-size:12px;font-weight:700;
+      cursor:pointer;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:6px}
+    .tpl-clear-btn:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.06)}
+
+    /* Quick Add card */
+    .qa-card{
+      background:var(--navy3);border:1.5px solid var(--border);
+      border-radius:12px;padding:16px 18px;margin-bottom:20px}
+    .qa-grid{display:grid;grid-template-columns:1.4fr 1.4fr 2fr 100px 80px;gap:10px;align-items:flex-end}
+    @media(max-width:900px){.qa-grid{grid-template-columns:1fr 1fr;gap:8px}}
+    @media(max-width:520px){.qa-grid{grid-template-columns:1fr}}
+    .qa-field label{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;
+                    letter-spacing:.06em;display:block;margin-bottom:4px}
+    .qa-field input,.qa-field select{
+      width:100%;padding:8px 11px;background:var(--card);
+      border:1.5px solid var(--border);border-radius:8px;
+      color:var(--text);font-size:12.5px;outline:none;
+      transition:border-color .15s;box-sizing:border-box}
+    .qa-field input:focus,.qa-field select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(30,111,255,.1)}
+    .qa-add-btn{
+      width:100%;padding:9px 16px;background:var(--blue);color:#fff;
+      border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;
+      transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;
+      white-space:nowrap}
+    .qa-add-btn:hover{background:#1660e8;transform:translateY(-1px);box-shadow:0 3px 10px rgba(30,111,255,.3)}
+    .qa-add-btn:active{transform:translateY(0)}
+
+    /* Line items table */
+    .li-wrap{background:var(--navy3);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+    .li-header{display:grid;grid-template-columns:1fr 72px 72px 96px 88px 32px;
+               gap:8px;padding:10px 14px;
+               background:var(--card2);border-bottom:2px solid var(--border);
+               font-size:10px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
+    .li-row{display:grid;grid-template-columns:1fr 72px 72px 96px 88px 32px;
+            gap:8px;padding:9px 14px;align-items:center;border-bottom:1px solid var(--border);
+            transition:background .12s}
+    .li-row:last-child{border-bottom:none}
+    .li-row:hover{background:rgba(30,111,255,.03)}
+    .li-input{
+      width:100%;padding:5px 8px;background:transparent;
+      border:1.5px solid transparent;border-radius:6px;color:var(--text);font-size:12.5px;outline:none;
+      transition:border-color .12s,background .12s;box-sizing:border-box}
+    .li-input:hover{border-color:var(--border);background:var(--card)}
+    .li-input:focus{border-color:var(--blue);background:var(--card);box-shadow:0 0 0 2px rgba(30,111,255,.1)}
+    .li-unit-sel{width:100%;padding:5px 4px;background:transparent;border:1.5px solid transparent;
+                 border-radius:6px;color:var(--text);font-size:12px;outline:none;cursor:pointer;
+                 transition:border-color .12s}
+    .li-unit-sel:hover,.li-unit-sel:focus{border-color:var(--blue);background:var(--card)}
+    .li-total{font-size:12.5px;font-weight:700;color:var(--green);text-align:right;padding-right:4px}
+    .li-del-btn{width:28px;height:28px;border:none;background:none;color:var(--text2);
+                cursor:pointer;border-radius:6px;font-size:16px;transition:all .12s;display:flex;align-items:center;justify-content:center}
+    .li-del-btn:hover{background:rgba(239,68,68,.12);color:var(--red)}
+    .li-empty{text-align:center;padding:40px 20px;color:var(--text2);font-size:13px}
+    .li-empty-icon{font-size:32px;margin-bottom:8px;opacity:.4}
+    .li-footer{display:flex;align-items:center;justify-content:space-between;
+               padding:10px 14px;border-top:2px solid var(--border);background:var(--card2)}
+    .li-count{font-size:11.5px;color:var(--text2);font-weight:600}
+    .li-blank-btn{
+      display:inline-flex;align-items:center;gap:5px;
+      padding:6px 14px;border-radius:7px;border:1.5px dashed var(--blue);
+      background:transparent;color:var(--blue);font-size:12px;font-weight:700;
+      cursor:pointer;transition:all .15s}
+    .li-blank-btn:hover{background:rgba(30,111,255,.08)}
+
+    /* Totals + O&P */
+    .totals-wrap{margin-top:20px;display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+    @media(max-width:720px){.totals-wrap{grid-template-columns:1fr}}
+    .op-card{
+      background:var(--navy3);border:1.5px solid var(--border);
+      border-radius:12px;padding:16px 18px}
+    .op-title{font-size:10.5px;font-weight:800;color:var(--text2);text-transform:uppercase;
+              letter-spacing:.1em;margin-bottom:12px}
+    .op-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+    .op-row:last-of-type{border-bottom:none}
+    .op-check{width:17px;height:17px;cursor:pointer;accent-color:var(--blue);flex-shrink:0}
+    .op-label{flex:1;font-size:13px;font-weight:600;color:var(--text);cursor:pointer}
+    .op-pct-input{
+      width:54px;padding:4px 8px;background:var(--card);
+      border:1.5px solid var(--border);border-radius:7px;
+      color:var(--text);font-size:12px;font-weight:700;outline:none;text-align:center;
+      transition:border-color .12s}
+    .op-pct-input:focus{border-color:var(--blue)}
+    .op-pct-sym{font-size:12px;color:var(--text2);font-weight:600}
+    .op-hint{font-size:10.5px;color:var(--text2);margin-top:10px;line-height:1.5;
+             padding:8px;background:rgba(30,111,255,.06);border-radius:7px;border-left:3px solid var(--blue)}
+    .totals-card{
+      background:var(--navy3);border:1.5px solid var(--border);
+      border-radius:12px;overflow:hidden}
+    .totals-row2{display:flex;justify-content:space-between;align-items:center;
+                 padding:10px 18px;font-size:13px;border-bottom:1px solid var(--border)}
+    .totals-row2:last-child{border-bottom:none}
+    .totals-row2 .lbl{color:var(--text2);font-weight:500}
+    .totals-row2 .amt{font-weight:700;color:var(--text)}
+    .totals-grand{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:14px 18px;background:linear-gradient(135deg,rgba(34,197,94,.1),rgba(34,197,94,.04));
+      border-top:2px solid rgba(34,197,94,.25)}
+    .totals-grand .lbl{font-size:14px;font-weight:800;color:var(--text)}
+    .totals-grand .amt{font-size:18px;font-weight:900;color:var(--green)}
+
+    /* Action buttons */
+    .est-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+    .btn-print{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:11px 24px;background:var(--blue);color:#fff;
+      border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;
+      transition:all .15s;box-shadow:0 2px 8px rgba(30,111,255,.22)}
+    .btn-print:hover{background:#1660e8;transform:translateY(-1px);box-shadow:0 4px 14px rgba(30,111,255,.32)}
+    .btn-copy{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:11px 22px;background:var(--navy3);color:var(--text);
+      border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;
+      transition:all .15s}
+    .btn-copy:hover{border-color:var(--blue);color:var(--blue);background:rgba(30,111,255,.06)}
+
+    /* Misc */
     .mo-table{width:100%;border-collapse:collapse;font-size:12.5px}
     .mo-table th{text-align:left;padding:8px 10px;background:var(--navy3);font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;border-bottom:2px solid var(--border)}
     .mo-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
     .tag-pill{padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:600;cursor:pointer;background:var(--navy3);color:var(--text2);border:1px solid var(--border);transition:all .15s}
     .tag-pill.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .input-sm{width:100%;padding:5px 8px;background:var(--navy3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none}
+    .input-sm:focus{border-color:var(--blue)} select.input-sm{cursor:pointer}
   </style>
+
+  <!-- ── TAB BAR ───────────────────────────────────────────────── -->
   <div class="db-tabs">
     <div class="db-tab active" onclick="switchDocTab('estimate')">&#x1F4CB; Estimate</div>
     <div class="db-tab" onclick="switchDocTab('matorder')">&#x1F4E6; Material Order</div>
     <div class="db-tab" onclick="switchDocTab('workorder')">&#x1F528; Work Order</div>
-    <div class="db-tab" onclick="switchDocTab('catalog')">&#x1F5C2;&#xFE0F; Product Catalog</div>
+    <div class="db-tab" onclick="switchDocTab('catalog')">&#x1F5C2;&#xFE0F; Catalog</div>
   </div>
 
-  <!-- ESTIMATE -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!--  ESTIMATE PANEL                                            -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="doc-panel active" id="panel-estimate">
-    <div class="card"><div class="card-header"><span class="card-title">&#x1F4CB; Estimate Builder</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="clearEstimate()">&#x1F5D1; Clear</button>
-        <button class="btn btn-primary btn-sm" onclick="printEstimate()">&#x1F5A8; Print/PDF</button>
-      </div></div>
-      <div class="card-body">
-        <div class="doc-header-form">
-          <div><label class="form-label">Homeowner Name</label><input class="form-input" id="est-owner" placeholder="First Last"/></div>
-          <div><label class="form-label">Property Address</label><input class="form-input" id="est-addr" placeholder="123 Main St, St. Louis MO 63123"/></div>
-          <div><label class="form-label">Estimate #</label><input class="form-input" id="est-num" placeholder="3109"/></div>
-          <div><label class="form-label">Date</label><input class="form-input" type="date" id="est-date" value="${new Date().toISOString().slice(0,10)}"/></div>
-          <div><label class="form-label">Insurance Carrier</label>
-            <select class="form-input" id="est-carrier">
+    <div class="card" style="border-radius:14px;overflow:hidden">
+
+      <!-- Card header -->
+      <div class="card-header" style="padding:18px 24px;border-bottom:1.5px solid var(--border)">
+        <div>
+          <span class="card-title" style="font-size:17px;font-weight:800">&#x1F4CB; Estimate Builder</span>
+          <div style="font-size:11.5px;color:var(--text2);margin-top:2px">Cox Roofing &amp; Restoration &mdash; Professional Estimate</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="clearEstimate()" title="Clear all fields and lines">&#x1F5D1; Clear All</button>
+          <button class="btn btn-primary btn-sm" onclick="printEstimate()" style="gap:6px;display:flex;align-items:center">&#x1F5A8;&#xFE0F; Print / PDF</button>
+        </div>
+      </div>
+
+      <div class="card-body" style="padding:24px">
+
+        <!-- ── SECTION 1: JOB INFO ─────────────────────────── -->
+        <div class="db-section-label">&#x1F3E0; Job Information</div>
+        <div class="est-header-grid" style="margin-bottom:24px">
+          <div class="est-field"><label>Homeowner Name</label>
+            <input id="est-owner" placeholder="First Last" /></div>
+          <div class="est-field" style="grid-column:span 2"><label>Property Address</label>
+            <input id="est-addr" placeholder="123 Main St, St. Louis MO 63123" /></div>
+          <div class="est-field"><label>Date</label>
+            <input type="date" id="est-date" value="${new Date().toISOString().slice(0,10)}" /></div>
+          <div class="est-field"><label>Estimate #</label>
+            <input id="est-num" placeholder="3109" /></div>
+          <div class="est-field"><label>Job # (JN)</label>
+            <input id="est-job" placeholder="4990" /></div>
+        </div>
+
+        <!-- ── SECTION 2: INSURANCE INFO ─────────────────────── -->
+        <div class="db-section-label">&#x1F6E1;&#xFE0F; Insurance Information</div>
+        <div class="est-header-grid" style="margin-bottom:24px">
+          <div class="est-field"><label>Insurance Carrier</label>
+            <select id="est-carrier">
               <option value="">-- Select --</option>
               <option>American Family</option><option>Allstate</option><option>State Farm</option>
               <option>Travelers</option><option>Hartford</option><option>Shelter</option>
@@ -4654,110 +4830,178 @@ function renderDocBuilderPage() {
               <option>Liberty Mutual</option><option>Nationwide</option><option>Auto-Owners</option>
               <option>Missouri Farm Bureau</option><option>Other / Out-of-Pocket</option>
             </select></div>
-          <div><label class="form-label">Claim Number</label><input class="form-input" id="est-claim" placeholder="Claim #"/></div>
-          <div><label class="form-label">Date of Loss</label><input class="form-input" type="date" id="est-dol"/></div>
-          <div><label class="form-label">Job # (JN)</label><input class="form-input" id="est-job" placeholder="4990"/></div>
-          <div><label class="form-label">Type of Loss</label>
-            <select class="form-input" id="est-loss">
+          <div class="est-field"><label>Claim Number</label>
+            <input id="est-claim" placeholder="Claim #" /></div>
+          <div class="est-field"><label>Type of Loss</label>
+            <select id="est-loss">
               <option>Wind and Hail</option><option>Wind Only</option><option>Hail Only</option>
-              <option>Storm Damage</option><option>Water Damage</option><option>Fire/Smoke</option><option>Retail / Out-of-Pocket</option>
+              <option>Storm Damage</option><option>Water Damage</option>
+              <option>Fire/Smoke</option><option>Retail / Out-of-Pocket</option>
             </select></div>
+          <div class="est-field"><label>Date of Loss</label>
+            <input type="date" id="est-dol" /></div>
         </div>
-        <hr style="border-color:var(--border);margin:16px 0">
-        <!-- ── GAF / Shingle System Templates ── -->
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-          <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">&#x1F3D7; Load Template:</div>
-          <select id="gaf-template-select" class="form-input" style="max-width:340px;font-weight:600;"
-            onchange="loadGAFTemplate(this.value);this.value=''">
-            <option value="">-- Shingle System Templates --</option>
-            <optgroup label="GAF Timberline">
-              <option value="gaf_hdz_full">Full Roof — GAF Timberline HDZ (Asphalt)</option>
-              <option value="gaf_hdz_ins">Full Roof — GAF Timberline HDZ + Insurance Scope</option>
-              <option value="gaf_cs_full">Full Roof — GAF Timberline CS (Cool Series)</option>
-              <option value="gaf_arh_full">Full Roof — GAF American Harvest (High-Wind)</option>
+
+        <!-- ── SECTION 3: GAF TEMPLATES ──────────────────────── -->
+        <div class="db-section-label">&#x1F3D7;&#xFE0F; Roof System Templates</div>
+        <div class="tpl-banner">
+          <div class="tpl-icon">&#x1F3D7;&#xFE0F;</div>
+          <div class="tpl-meta">
+            <strong>Load a Pre-Built Roof System</strong>
+            <span>Instantly populates all line items — edit quantities &amp; prices after loading</span>
+          </div>
+          <select id="gaf-template-select" class="tpl-select"
+            onchange="loadGAFTemplate(this.value);this.value=''"
+            title="Select a template to auto-fill line items">
+            <option value="">&#x2193; Choose a template...</option>
+            <optgroup label="&#x1F7E2; GAF Timberline System">
+              <option value="gaf_hdz_full">GAF Timberline HDZ — Standard System</option>
+              <option value="gaf_hdz_ins">GAF Timberline HDZ — Full Insurance Scope</option>
+              <option value="gaf_cs_full">GAF Timberline CS — Cool Series</option>
+              <option value="gaf_arh_full">GAF American Harvest — High-Wind / Class IV</option>
             </optgroup>
-            <optgroup label="Other Manufacturers">
-              <option value="oc_duration_full">Full Roof — Owens Corning Duration</option>
-              <option value="ct_landmark_full">Full Roof — CertainTeed Landmark</option>
+            <optgroup label="&#x1F535; Other Manufacturers">
+              <option value="oc_duration_full">Owens Corning Duration — SureNail</option>
+              <option value="ct_landmark_full">CertainTeed Landmark Pro</option>
             </optgroup>
-            <optgroup label="Flat / Low-Slope">
-              <option value="modbit_full">Flat Roof — Modified Bitumen (Torch-Down)</option>
+            <optgroup label="&#x26AB; Flat / Low-Slope">
+              <option value="modbit_full">Modified Bitumen Torch-Down System</option>
             </optgroup>
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="if(confirm('Clear all line items?')){estLines=[];renderEstLines();}" style="white-space:nowrap;font-weight:700;">
-            &#x1F5D1; Clear All Lines
+          <button class="tpl-clear-btn" onclick="if(estLines.length===0||confirm('Remove all ${estLines.length} line items?')){estLines=[];renderEstLines();}">
+            &#x1F5D1; Clear Items
           </button>
         </div>
-        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Quick Add Line Item</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;margin-bottom:12px;align-items:flex-end">
-          <div><label class="form-label">Trade</label>
-            <select class="form-input" id="qa-trade" onchange="updateQATrade()">
-              <option value="roofing_shingles">Roofing -- Shingles</option>
-              <option value="roofing_underlayment">Roofing -- Underlayment</option>
-              <option value="roofing_icewater">Roofing -- Ice & Water</option>
-              <option value="roofing_ridge">Roofing -- Ridge Cap</option>
-              <option value="roofing_starter">Roofing -- Starter Strip</option>
-              <option value="roofing_ventilation">Roofing -- Ventilation</option>
-              <option value="roofing_flashing">Roofing -- Flashing</option>
-              <option value="roofing_decking">Roofing -- Decking</option>
-              <option value="roofing_flatroof">Roofing -- Flat Roof</option>
-              <option value="roofing_labor">Roofing -- Labor</option>
-              <option value="gutters">Gutters & Downspouts</option>
-              <option value="siding">Siding & Accessories</option>
-              <option value="windows">Windows</option>
-              <option value="doors">Doors</option>
-              <option value="labor_gutters">Labor -- Gutters</option>
-              <option value="labor_siding">Labor -- Siding</option>
-              <option value="labor_windows">Labor -- Windows</option>
-              <option value="labor_roofing">Labor -- Roofing</option>
-            </select></div>
-          <div><label class="form-label">Product</label><select class="form-input" id="qa-product" onchange="updateQAProduct()"></select></div>
-          <div><label class="form-label">Description</label><input class="form-input" id="qa-desc" placeholder="Auto-filled"/></div>
-          <div><label class="form-label">Unit Price</label><input class="form-input" id="qa-price" type="number" step="0.01" placeholder="0.00"/></div>
-          <div><label class="form-label">Qty</label><input class="form-input" id="qa-qty" type="number" step="0.01" placeholder="1"/></div>
+
+        <!-- ── SECTION 4: QUICK ADD ───────────────────────────── -->
+        <div class="db-section-label">&#x2795; Quick Add Line Item</div>
+        <div class="qa-card">
+          <div class="qa-grid">
+            <div class="qa-field"><label>Trade</label>
+              <select id="qa-trade" onchange="updateQATrade()">
+                <option value="roofing_shingles">Roofing &mdash; Shingles</option>
+                <option value="roofing_underlayment">Roofing &mdash; Underlayment</option>
+                <option value="roofing_icewater">Roofing &mdash; Ice &amp; Water</option>
+                <option value="roofing_ridge">Roofing &mdash; Ridge Cap</option>
+                <option value="roofing_starter">Roofing &mdash; Starter Strip</option>
+                <option value="roofing_ventilation">Roofing &mdash; Ventilation</option>
+                <option value="roofing_flashing">Roofing &mdash; Flashing</option>
+                <option value="roofing_decking">Roofing &mdash; Decking</option>
+                <option value="roofing_flatroof">Roofing &mdash; Flat Roof</option>
+                <option value="roofing_labor">Roofing &mdash; Labor</option>
+                <option value="gutters">Gutters &amp; Downspouts</option>
+                <option value="siding">Siding &amp; Accessories</option>
+                <option value="windows">Windows</option>
+                <option value="doors">Doors</option>
+                <option value="labor_gutters">Labor &mdash; Gutters</option>
+                <option value="labor_siding">Labor &mdash; Siding</option>
+                <option value="labor_windows">Labor &mdash; Windows</option>
+                <option value="labor_roofing">Labor &mdash; Roofing</option>
+              </select></div>
+            <div class="qa-field"><label>Product</label>
+              <select id="qa-product" onchange="updateQAProduct()"></select></div>
+            <div class="qa-field"><label>Description</label>
+              <input id="qa-desc" placeholder="Auto-filled from product"
+                onkeydown="if(event.key==='Enter'){document.getElementById('qa-price').focus()}" /></div>
+            <div class="qa-field"><label>Unit Price ($)</label>
+              <input id="qa-price" type="number" step="0.01" placeholder="0.00"
+                onkeydown="if(event.key==='Enter'){document.getElementById('qa-qty').focus()}" /></div>
+            <div class="qa-field" style="display:flex;flex-direction:column">
+              <label>Qty</label>
+              <div style="display:flex;gap:6px;align-items:stretch">
+                <input id="qa-qty" type="number" step="0.01" placeholder="1" style="flex:1"
+                  onkeydown="if(event.key==='Enter'){addLineToEstimate()}" />
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="qa-add-btn" style="width:auto;padding:9px 28px" onclick="addLineToEstimate()">
+              &#xFF0B; Add to Estimate
+            </button>
+            <span style="font-size:11.5px;color:var(--text2)">or press <kbd style="padding:2px 6px;background:var(--card2);border:1px solid var(--border);border-radius:4px;font-size:10.5px">Enter</kbd> in Qty</span>
+          </div>
         </div>
-        <button class="add-line-btn" onclick="addLineToEstimate()">&#xFF0B; Add to Estimate</button>
-        <hr style="border-color:var(--border);margin:16px 0">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:700">Line Items</div>
-          <button class="btn btn-ghost btn-sm" onclick="addBlankLine()">&#xFF0B; Blank Line</button>
+
+        <!-- ── SECTION 5: LINE ITEMS TABLE ───────────────────── -->
+        <div class="db-section-label">&#x1F4C4; Line Items</div>
+        <div class="li-wrap">
+          <div class="li-header">
+            <span>Description</span>
+            <span style="text-align:center">Qty</span>
+            <span style="text-align:center">Unit</span>
+            <span style="text-align:right">Unit Price</span>
+            <span style="text-align:right">Total</span>
+            <span></span>
+          </div>
+          <div id="est-lines">
+            <div class="li-empty">
+              <div class="li-empty-icon">&#x1F4C4;</div>
+              No line items yet &mdash; load a template or use Quick Add above
+            </div>
+          </div>
+          <div class="li-footer">
+            <span class="li-count" id="li-count-label">0 items</span>
+            <button class="li-blank-btn" onclick="addBlankLine()">&#xFF0B; Blank Line</button>
+          </div>
         </div>
-        <div class="line-item-header"><span>Description</span><span>Qty</span><span>Unit</span><span>Unit Price</span><span>Total</span><span></span></div>
-        <div id="est-lines"><div style="text-align:center;color:var(--text2);padding:20px;font-size:13px">No line items yet</div></div>
-        <!-- O&P Controls -->
-        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:12px 16px;background:var(--navy3);border:1px solid var(--border);border-radius:10px;margin-top:14px;margin-bottom:10px;">
-          <span style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Include in Total:</span>
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;">
-            <input type="checkbox" id="op-include-overhead" checked onchange="recalcEst()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue);">
-            Overhead
-            <input type="number" id="op-overhead-pct" value="10" min="0" max="50" step="0.5"
-              style="width:52px;padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-weight:700;outline:none;"
-              oninput="recalcEst()">
-            <span style="font-size:12px;color:var(--text2);">%</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;">
-            <input type="checkbox" id="op-include-profit" checked onchange="recalcEst()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue);">
-            Profit
-            <input type="number" id="op-profit-pct" value="10" min="0" max="50" step="0.5"
-              style="width:52px;padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-weight:700;outline:none;"
-              oninput="recalcEst()">
-            <span style="font-size:12px;color:var(--text2);">%</span>
-          </label>
-          <span style="font-size:11px;color:var(--text2);margin-left:auto;">Roof-only job = 5%/5% &nbsp;|&nbsp; Multi-trade = 10%/10%</span>
+
+        <!-- ── SECTION 6: O&P + TOTALS ────────────────────────── -->
+        <div class="totals-wrap">
+
+          <!-- Left: O&P controls -->
+          <div class="op-card">
+            <div class="op-title">&#x2699;&#xFE0F; Overhead &amp; Profit</div>
+            <div class="op-row">
+              <input type="checkbox" id="op-include-overhead" class="op-check" checked onchange="recalcEst()">
+              <label for="op-include-overhead" class="op-label">Include Overhead</label>
+              <input type="number" id="op-overhead-pct" class="op-pct-input" value="10" min="0" max="50" step="0.5" oninput="recalcEst()">
+              <span class="op-pct-sym">%</span>
+            </div>
+            <div class="op-row">
+              <input type="checkbox" id="op-include-profit" class="op-check" checked onchange="recalcEst()">
+              <label for="op-include-profit" class="op-label">Include Profit</label>
+              <input type="number" id="op-profit-pct" class="op-pct-input" value="10" min="0" max="50" step="0.5" oninput="recalcEst()">
+              <span class="op-pct-sym">%</span>
+            </div>
+            <div class="op-hint">
+              &#x1F4A1; <strong>Roof-only jobs:</strong> 5% / 5%<br>
+              <strong>Multi-trade (exterior):</strong> 10% / 10%
+            </div>
+          </div>
+
+          <!-- Right: Totals -->
+          <div>
+            <div class="totals-card">
+              <div class="totals-row2"><span class="lbl">Subtotal</span><span class="amt" id="est-subtotal">$0.00</span></div>
+              <div class="totals-row2" id="est-overhead-row">
+                <span class="lbl" id="est-overhead-lbl">Overhead (10%)</span>
+                <span class="amt" id="est-overhead">$0.00</span>
+              </div>
+              <div class="totals-row2" id="est-profit-row">
+                <span class="lbl" id="est-profit-lbl">Profit (10%)</span>
+                <span class="amt" id="est-profit">$0.00</span>
+              </div>
+              <div class="totals-row2">
+                <span class="lbl">Material Sales Tax (9.679%)</span>
+                <span class="amt" id="est-tax">$0.00</span>
+              </div>
+              <div class="totals-grand">
+                <span class="lbl">TOTAL RCV</span>
+                <span class="amt" id="est-grand">$0.00</span>
+              </div>
+            </div>
+
+            <!-- Action buttons live under totals -->
+            <div class="est-actions">
+              <button class="btn-print" onclick="printEstimate()">&#x1F5A8;&#xFE0F; Print / Export PDF</button>
+              <button class="btn-copy" onclick="copyEstimateText()">&#x1F4CB; Copy as Text</button>
+            </div>
+          </div>
         </div>
-        <div class="totals-box">
-          <div class="totals-row"><span class="label">Subtotal</span><span class="val" id="est-subtotal">$0.00</span></div>
-          <div class="totals-row" id="est-overhead-row"><span class="label" id="est-overhead-lbl">Overhead (10%)</span><span class="val" id="est-overhead">$0.00</span></div>
-          <div class="totals-row" id="est-profit-row"><span class="label" id="est-profit-lbl">Profit (10%)</span><span class="val" id="est-profit">$0.00</span></div>
-          <div class="totals-row"><span class="label">Material Sales Tax (9.679%)</span><span class="val" id="est-tax">$0.00</span></div>
-          <div class="totals-row"><span>TOTAL RCV</span><span id="est-grand">$0.00</span></div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="printEstimate()">&#x1F5A8; Print / Export PDF</button>
-          <button class="btn btn-ghost" onclick="copyEstimateText()">&#x1F4CB; Copy as Text</button>
-        </div>
-      </div></div>
-  </div>
+
+      </div><!-- /card-body -->
+    </div><!-- /card -->
+  </div><!-- /panel-estimate -->
 
   <!-- MATERIAL ORDER -->
   <div class="doc-panel" id="panel-matorder">
@@ -4766,8 +5010,9 @@ function renderDocBuilderPage() {
   </div>
 
   <!-- WORK ORDER -->
-    <div class="doc-panel" id="panel-workorder"><div id="wo-panel-inner"></div></div>
-
+  <div class="doc-panel" id="panel-workorder">
+    <div id="wo-panel-inner"></div>
+  </div>
 
   <!-- PRODUCT CATALOG -->
   <div class="doc-panel" id="panel-catalog">
@@ -4856,156 +5101,42 @@ let estLines = [];
 
 function renderEstLines() {
   const container = document.getElementById('est-lines');
+  const countEl   = document.getElementById('li-count-label');
   if (!container) return;
+
   if (estLines.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;font-size:13px">No line items yet -- use Quick Add or click Blank Line</div>';
+    container.innerHTML = `
+      <div class="li-empty">
+        <div class="li-empty-icon">&#x1F4C4;</div>
+        No line items yet &mdash; load a template or use Quick Add above
+      </div>`;
+    if (countEl) countEl.textContent = '0 items';
   } else {
     container.innerHTML = estLines.map((l,i) => `
-      <div class="line-item-row">
-        <input class="input-sm" value="${l.desc}" onchange="estLines[${i}].desc=this.value;recalcEst()" />
-        <input class="input-sm" type="number" step="0.01" value="${l.qty}" onchange="estLines[${i}].qty=parseFloat(this.value)||0;recalcEst()" />
-        <select class="input-sm" onchange="estLines[${i}].unit=this.value">
-          ${['SQ','SF','LF','EA','HR','LS'].map(u=>`<option ${l.unit===u?'selected':''}>${u}</option>`).join('')}
+      <div class="li-row">
+        <input class="li-input" value="${(l.desc||'').replace(/"/g,'&quot;')}"
+          onchange="estLines[${i}].desc=this.value"
+          placeholder="Line item description" />
+        <input class="li-input" type="number" step="0.01"
+          value="${l.qty}" style="text-align:center"
+          onchange="estLines[${i}].qty=parseFloat(this.value)||0;recalcEst()" />
+        <select class="li-unit-sel"
+          onchange="estLines[${i}].unit=this.value">
+          ${['SQ','SF','LF','EA','HR','LS','SH','GL','BOX'].map(u=>`<option ${l.unit===u?'selected':''}>${u}</option>`).join('')}
         </select>
-        <input class="input-sm" type="number" step="0.01" value="${l.price}" onchange="estLines[${i}].price=parseFloat(this.value)||0;recalcEst()" />
-        <span style="font-size:12px;font-weight:700;color:var(--green)">$${(l.qty*l.price).toFixed(2)}</span>
-        <button onclick="estLines.splice(${i},1);renderEstLines();recalcEst()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">&#xD7;</button>
+        <input class="li-input" type="number" step="0.01"
+          value="${l.price}" style="text-align:right"
+          onchange="estLines[${i}].price=parseFloat(this.value)||0;recalcEst()" />
+        <span class="li-total">$${((l.qty||0)*(l.price||0)).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}</span>
+        <button class="li-del-btn" title="Remove line"
+          onclick="estLines.splice(${i},1);renderEstLines();recalcEst()">&#xD7;</button>
       </div>`).join('');
+    if (countEl) countEl.textContent = estLines.length + (estLines.length===1?' item':' items');
   }
   recalcEst();
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-//  GAF & Shingle System Templates — Realistic full roof systems
-//  All qtys default to 35 SQ — user edits after load
-// ═══════════════════════════════════════════════════════════════════
-const GAF_TEMPLATES = {
-
-  // ── 1. Full Roof — GAF Timberline HDZ (standard insurance scope) ──
-  gaf_hdz_full: {
-    name: "Full Roof — GAF Timberline HDZ",
-    lines: [
-      { desc: "GAF Timberline HDZ — Weathered Wood (Shingles)", qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF FeltBuster Synthetic Underlayment",          qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF WeatherWatch Ice & Water Shield (Eaves/Valleys)", qty: 5,  unit: "SQ",  price: 0 },
-      { desc: "GAF TimberTex Premium Ridge Cap Shingles",       qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF ProStart Eave/Rake Starter Strip",           qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF Cobra Ridge Vent (Continuous Ridge Vent)",   qty: 30, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Eaves (2x4 mill finish)", qty: 80, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Rakes (2x4 mill finish)", qty: 60, unit: "LF",  price: 0 },
-      { desc: "Step Flashing / Counter Flashing (Aluminum)",    qty: 20, unit: "LF",  price: 0 },
-      { desc: "Roofing Nails — Coil (1-3/4\")",                qty: 2,  unit: "BOX", price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",       qty: 35, unit: "SQ",  price: 0 },
-    ]
-  },
-
-  // ── 2. Full Roof — GAF Timberline HDZ + Insurance Supplement Items ──
-  gaf_hdz_ins: {
-    name: "Full Roof — GAF HDZ w/ Insurance Supplement",
-    lines: [
-      { desc: "GAF Timberline HDZ — Charcoal (Shingles)",       qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF FeltBuster Synthetic Underlayment",          qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF WeatherWatch Ice & Water Shield (Eaves/Valleys)", qty: 5, unit: "SQ",  price: 0 },
-      { desc: "GAF TimberTex Premium Ridge Cap Shingles",       qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF ProStart Eave/Rake Starter Strip",           qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF Cobra Ridge Vent",                           qty: 30, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Eaves",                   qty: 80, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Rakes",                   qty: 60, unit: "LF",  price: 0 },
-      { desc: "Step Flashing / Counter Flashing",               qty: 20, unit: "LF",  price: 0 },
-      { desc: "Pipe Jack Flashing (Boot) — 3\" PVC",            qty: 3,  unit: "EA",  price: 0 },
-      { desc: "Chimney Flashing — Counterflash & Step",         qty: 1,  unit: "EA",  price: 0 },
-      { desc: "Plywood Decking Replacement (7/16\" OSB)",       qty: 4,  unit: "SH",  price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",       qty: 35, unit: "SQ",  price: 0 },
-      { desc: "Dumpster / Haul-Away Fee",                       qty: 1,  unit: "EA",  price: 0 },
-    ]
-  },
-
-  // ── 3. Full Roof — GAF Timberline CS (Cool Series, white/light colors) ──
-  gaf_cs_full: {
-    name: "Full Roof — GAF Timberline CS (Cool Series)",
-    lines: [
-      { desc: "GAF Timberline CS — Barkwood (Cool Series Shingles)", qty: 35, unit: "SQ", price: 0 },
-      { desc: "GAF FeltBuster Synthetic Underlayment",               qty: 35, unit: "SQ", price: 0 },
-      { desc: "GAF WeatherWatch Ice & Water Shield",                  qty: 5,  unit: "SQ", price: 0 },
-      { desc: "GAF TimberTex Double-Layer Ridge Cap",                 qty: 30, unit: "LF", price: 0 },
-      { desc: "GAF ProStart Starter Strip",                          qty: 30, unit: "LF", price: 0 },
-      { desc: "GAF Cobra Snow Country Ridge Vent",                   qty: 30, unit: "LF", price: 0 },
-      { desc: "Aluminum Drip Edge — Eaves",                          qty: 80, unit: "LF", price: 0 },
-      { desc: "Aluminum Drip Edge — Rakes",                          qty: 60, unit: "LF", price: 0 },
-      { desc: "Step / Counter Flashing (Aluminum)",                  qty: 20, unit: "LF", price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",            qty: 35, unit: "SQ", price: 0 },
-    ]
-  },
-
-  // ── 4. Full Roof — GAF American Harvest (High-Wind / Enhanced) ──
-  gaf_arh_full: {
-    name: "Full Roof — GAF American Harvest (Enhanced Class IV)",
-    lines: [
-      { desc: "GAF American Harvest Shingles — Slate",          qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF StormGuard Film-Surfaced Ice & Water Shield",qty: 10, unit: "SQ",  price: 0 },
-      { desc: "GAF FeltBuster Synthetic Underlayment (2-layer)", qty: 35, unit: "SQ",  price: 0 },
-      { desc: "GAF Seal-A-Ridge Class IV Ridge Cap",             qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF WeatherBlocker Pro Starter Strip",            qty: 30, unit: "LF",  price: 0 },
-      { desc: "GAF Cobra Snow Country Advanced Ridge Vent",      qty: 30, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Eaves",                    qty: 80, unit: "LF",  price: 0 },
-      { desc: "Galvanized Drip Edge — Rakes",                    qty: 60, unit: "LF",  price: 0 },
-      { desc: "Step Flashing & Counter Flashing (Aluminum)",     qty: 20, unit: "LF",  price: 0 },
-      { desc: "High-Wind Fastening — 6-Nail Pattern Labor",      qty: 35, unit: "SQ",  price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",        qty: 35, unit: "SQ",  price: 0 },
-    ]
-  },
-
-  // ── 5. Full Roof — Owens Corning Duration ──
-  oc_duration_full: {
-    name: "Full Roof — Owens Corning Duration",
-    lines: [
-      { desc: "Owens Corning Duration — Charcoal (SureNail Shingles)", qty: 35, unit: "SQ", price: 0 },
-      { desc: "Owens Corning WeatherLock Ice & Water Barrier",          qty: 5,  unit: "SQ", price: 0 },
-      { desc: "Owens Corning Deck Defense Synthetic Underlayment",      qty: 35, unit: "SQ", price: 0 },
-      { desc: "Owens Corning Hip & Ridge 12 Cap Shingles",              qty: 30, unit: "LF", price: 0 },
-      { desc: "Owens Corning Starter Strip Plus",                       qty: 30, unit: "LF", price: 0 },
-      { desc: "Owens Corning VentSure Ridge Vent",                      qty: 30, unit: "LF", price: 0 },
-      { desc: "Galvanized Drip Edge — Eaves",                           qty: 80, unit: "LF", price: 0 },
-      { desc: "Galvanized Drip Edge — Rakes",                           qty: 60, unit: "LF", price: 0 },
-      { desc: "Step / Counter Flashing",                                qty: 20, unit: "LF", price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",               qty: 35, unit: "SQ", price: 0 },
-    ]
-  },
-
-  // ── 6. Full Roof — CertainTeed Landmark ──
-  ct_landmark_full: {
-    name: "Full Roof — CertainTeed Landmark",
-    lines: [
-      { desc: "CertainTeed Landmark — Charcoal Black (Shingles)", qty: 35, unit: "SQ", price: 0 },
-      { desc: "CertainTeed WinterGuard Ice & Water Barrier",       qty: 5,  unit: "SQ", price: 0 },
-      { desc: "CertainTeed DiamondDeck Synthetic Underlayment",    qty: 35, unit: "SQ", price: 0 },
-      { desc: "CertainTeed CT Hip & Ridge Cap Shingles",           qty: 30, unit: "LF", price: 0 },
-      { desc: "CertainTeed SwiftStart Starter Strip",              qty: 30, unit: "LF", price: 0 },
-      { desc: "CertainTeed RidgeVent III",                         qty: 30, unit: "LF", price: 0 },
-      { desc: "Aluminum Drip Edge — Eaves",                        qty: 80, unit: "LF", price: 0 },
-      { desc: "Aluminum Drip Edge — Rakes",                        qty: 60, unit: "LF", price: 0 },
-      { desc: "Step / Counter Flashing",                           qty: 20, unit: "LF", price: 0 },
-      { desc: "Roofing Labor — Tear-Off & Install (RFG)",          qty: 35, unit: "SQ", price: 0 },
-    ]
-  },
-
-  // ── 7. Flat Roof — Modified Bitumen Torch-Down System ──
-  modbit_full: {
-    name: "Flat Roof — Modified Bitumen (Torch-Down)",
-    lines: [
-      { desc: "Modified Bitumen Base Sheet (SBS)",               qty: 10, unit: "SQ", price: 0 },
-      { desc: "Modified Bitumen Cap Sheet — Granule Surface",    qty: 10, unit: "SQ", price: 0 },
-      { desc: "GAF Liberty SBS Self-Adhering Base Sheet",        qty: 10, unit: "SQ", price: 0 },
-      { desc: "Asphaltic Primer / Bonding Adhesive",             qty: 5,  unit: "GL", price: 0 },
-      { desc: "Perimeter Metal Edge (Gravel Stop 4\")",          qty: 40, unit: "LF", price: 0 },
-      { desc: "Roof Drain / Scupper Replacement",                qty: 2,  unit: "EA", price: 0 },
-      { desc: "Flat Roof Labor — Tear-Off & Install",            qty: 10, unit: "SQ", price: 0 },
-    ]
-  },
-};
-
-// Load a template into estLines — fully editable after
 function loadGAFTemplate(key) {
   if (!key || !GAF_TEMPLATES[key]) return;
   const tpl = GAF_TEMPLATES[key];
