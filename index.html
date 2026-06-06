@@ -5869,7 +5869,7 @@ function updatePCSummary() {
   const payHoldMsg = document.getElementById('pc-pay-hold-msg');
   if (payHold) {
     payHold.style.display = missingRequired > 0 ? 'flex' : 'none';
-    if (payHoldMsg) payHoldMsg.textContent = \`\${missingRequired} required photo\${missingRequired===1?'':'s'} missing — crew pay is on hold until all required photos are uploaded and verified by Austin.\`;
+    if (payHoldMsg) payHoldMsg.textContent = `${missingRequired} required photo${missingRequired===1?'':'s'} missing — crew pay is on hold until all required photos are uploaded and verified by Austin.`;
   }
 }
 
