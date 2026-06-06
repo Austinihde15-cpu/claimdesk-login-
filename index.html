@@ -8398,5 +8398,611 @@ async function submitInvitePanel(){
 
 </script>
 
+
+<script>
+// ══════ PHOTO CHECKLIST MODULE ══════
+let pcState = {
+  jobType: 'full_roof',
+  jobNum: '',
+  homeowner: '',
+  address: '',
+  photos: {},       // { item_id: { file, dataUrl, note, ts } }
+  submitted: false,
+  role: 'all',      // 'all' | 'salesman' | 'crew_lead'
+};
+
+// -------------------------------------------------------------
+//  RENDER MAIN PAGE
+// -------------------------------------------------------------
+function renderPhotoChecklistPage() {
+  document.getElementById('content').innerHTML = `
+  <style>
+    /* ── Global checklist container ── */
+    .checklist-container { background:#f8fafc; padding:2rem; }
+
+    /* ── Section cards ── */
+    .section-card {
+      background:#ffffff; border:1px solid #e2e8f0; border-radius:12px;
+      padding:1.75rem; margin-bottom:1.5rem;
+      box-shadow:0 4px 6px -1px rgba(0,0,0,.07),0 2px 4px -2px rgba(0,0,0,.05);
+    }
+
+    /* ── Bold crisp typography ── */
+    .pc-hero-title, .pc-section-title, .pc-stat-label,
+    .pc-item-label, .type-btn, label, .form-label {
+      font-weight:700 !important; letter-spacing:-0.02em;
+    }
+    .text-muted { color:#475569; }
+
+    /* ── Dark hero banner ── */
+    .pc-hero {
+      background:#0f172a; color:#fff;
+      border-radius:16px; padding:28px 32px; margin-bottom:24px;
+      display:flex; align-items:flex-start; justify-content:space-between;
+      flex-wrap:wrap; gap:16px;
+      box-shadow:0 8px 24px rgba(0,0,0,.25);
+    }
+    .pc-hero-title {
+      font-size:22px; font-weight:800; letter-spacing:-0.03em; margin-bottom:6px;
+    }
+    .pc-hero-sub { font-size:14px; color:#94a3b8; line-height:1.5; }
+
+    /* ── Job info grid ── */
+    .pc-job-bar {
+      display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px;
+      background:#ffffff; border:1px solid #e2e8f0; border-radius:12px;
+      padding:20px 24px; margin-bottom:24px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+    }
+    @media(max-width:700px){.pc-job-bar{grid-template-columns:1fr 1fr;}}
+
+    /* ── Summary stat cards ── */
+    .pc-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
+    @media(max-width:700px){.pc-summary-grid{grid-template-columns:1fr 1fr;}}
+    .pc-stat {
+      background:linear-gradient(135deg,#f8fafc,#ffffff);
+      border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+    }
+    .pc-stat-label {
+      font-size:10px; font-weight:800; color:#64748b;
+      text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px;
+    }
+    .pc-stat-val { font-size:2.25rem; font-weight:800; color:#0f172a; line-height:1; }
+    .status-number { font-size:2.25rem; font-weight:800; color:#0f172a; }
+
+    /* ── Job type selector ── */
+    .type-selector { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
+    .type-btn {
+      display:flex; align-items:center; gap:8px; padding:10px 18px;
+      border-radius:10px; border:2px solid #e2e8f0;
+      background:#ffffff; color:#475569;
+      font-size:13px; font-weight:700; cursor:pointer;
+      transition:all .15s; letter-spacing:-.01em;
+    }
+    .type-btn:hover { border-color:#3b82f6; color:#1d4ed8; background:#eff6ff; }
+    .type-btn.active {
+      background:#2563eb; border-color:#2563eb; color:#fff;
+      box-shadow:0 4px 12px rgba(37,99,235,.3);
+    }
+
+    /* ── Checklist sections ── */
+    .pc-section { margin-bottom:28px; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .pc-section-hdr {
+      display:flex; align-items:center; gap:10px; padding:14px 18px;
+      border-radius:0;
+    }
+    .pc-section-title { font-size:14px; font-weight:800; color:#fff; letter-spacing:-.01em; }
+    .pc-section-count {
+      font-size:11px; font-weight:700; background:rgba(255,255,255,.18);
+      padding:3px 10px; border-radius:12px; color:#fff;
+    }
+    .pc-items {
+      border:1px solid #e2e8f0; border-top:none;
+      border-radius:0 0 12px 12px; overflow:hidden; background:#fff;
+    }
+    .pc-item {
+      display:grid; grid-template-columns:36px 1fr 160px 140px; gap:12px;
+      padding:14px 18px; border-bottom:1px solid #f1f5f9;
+      align-items:center; transition:background .1s;
+    }
+    .pc-item:last-child { border-bottom:none; }
+    .pc-item:hover { background:#f8fafc; }
+    @media(max-width:800px){.pc-item{grid-template-columns:36px 1fr;gap:8px;}}
+    .pc-status-dot {
+      width:20px; height:20px; border-radius:50%;
+      border:2px solid #cbd5e1;
+      display:flex; align-items:center; justify-content:center;
+      font-size:10px; cursor:pointer; flex-shrink:0; transition:all .2s;
+    }
+    .pc-status-dot.done { background:#16a34a; border-color:#16a34a; color:#fff; }
+    .pc-status-dot.skipped { background:#4b5563; border-color:#4b5563; color:#fff; }
+    .pc-item-label { font-size:13px; font-weight:700; color:#0f172a; }
+    .pc-item-desc { font-size:11.5px; color:#64748b; margin-top:2px; }
+    .pc-item-tip { font-size:11px; color:#d97706; margin-top:3px; font-style:italic; }
+    .pc-required-badge {
+      display:inline-flex; padding:2px 8px; border-radius:10px;
+      font-size:10px; font-weight:800;
+      background:#fee2e2; color:#dc2626; margin-left:6px; letter-spacing:.02em;
+    }
+
+    /* ── Photo upload ── */
+    .photo-thumb-area { display:flex; align-items:center; gap:8px; }
+    .photo-thumb {
+      width:48px; height:48px; border-radius:6px; object-fit:cover;
+      border:2px solid #16a34a; cursor:pointer;
+    }
+    .photo-upload-btn {
+      display:inline-flex; align-items:center; gap:5px; padding:6px 12px;
+      border-radius:7px; border:1.5px dashed #cbd5e1; background:transparent;
+      color:#64748b; font-size:11.5px; font-weight:700; cursor:pointer;
+      transition:all .15s; white-space:nowrap;
+    }
+    .photo-upload-btn:hover { border-color:#3b82f6; color:#2563eb; background:#eff6ff; }
+    .photo-note-input {
+      width:100%; padding:6px 10px; background:#f8fafc;
+      border:1.5px solid #e2e8f0; border-radius:6px;
+      color:#0f172a; font-size:11.5px; outline:none; transition:border .15s;
+    }
+    .photo-note-input:focus { border-color:#3b82f6; }
+
+    /* ── Progress bar ── */
+    .pc-progress-bar-wrap {
+      background:#e2e8f0; border-radius:20px; height:8px; overflow:hidden; margin:8px 0;
+    }
+    .pc-progress-bar {
+      height:100%; border-radius:20px; transition:width .4s;
+      background:linear-gradient(90deg,#3b82f6,#16a34a);
+    }
+
+    /* ── Pay Hold Banner (CRITICAL) ── */
+    .pay-hold-banner {
+      background:#7f1d1d; border:2px solid #dc2626; border-radius:16px;
+      padding:22px 24px; margin-bottom:22px;
+      display:flex; align-items:flex-start; gap:16px;
+      box-shadow:0 4px 20px rgba(220,38,38,.3);
+    }
+    .pay-hold-icon { font-size:36px; flex-shrink:0; margin-top:2px; }
+    .pay-hold-title {
+      font-size:18px; font-weight:800; color:#ffffff;
+      margin-bottom:4px; letter-spacing:-.02em;
+    }
+    .pay-hold-sub { font-size:13px; color:#fca5a5; line-height:1.5; }
+
+    /* ── Gap warning ── */
+    .gap-warning {
+      background:#fefce8; border:1px solid #ca8a04; border-radius:10px;
+      padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:#854d0e;
+    }
+
+    /* ── Role / banner strips ── */
+    .role-switcher-row {
+      display:flex; align-items:center; gap:10px;
+      margin-bottom:18px; flex-wrap:wrap;
+    }
+    .role-switcher-label {
+      font-size:11px; font-weight:800; color:#64748b;
+      text-transform:uppercase; letter-spacing:.08em; white-space:nowrap;
+    }
+    .role-switcher-group {
+      display:flex; gap:6px; background:#f1f5f9;
+      border:1px solid #e2e8f0; border-radius:10px; padding:4px;
+    }
+    .role-switcher-btn {
+      padding:8px 18px; border-radius:7px; border:none;
+      font-size:12px; font-weight:700; cursor:pointer; transition:all .15s;
+      background:transparent; color:#64748b;
+    }
+    .role-switcher-btn.active { background:#2563eb; color:#fff; box-shadow:0 2px 8px rgba(37,99,235,.25); }
+
+    /* ── Submit button ── */
+    .submit-review-btn {
+      background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff;
+      border:none; padding:14px 32px; border-radius:10px;
+      font-size:14px; font-weight:800; cursor:pointer;
+      transition:all .2s; box-shadow:0 4px 16px rgba(37,99,235,.35);
+      letter-spacing:-.01em;
+    }
+    .submit-review-btn:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(37,99,235,.45); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .photo-modal {
+      background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+      max-width:500px; width:95vw; max-height:85vh; overflow-y:auto;
+    }
+    .photo-modal img { width:100%; border-radius:8px; }
+  </style>
+
+  <!-- ══ DARK HERO BANNER ══ -->
+  <div class="pc-hero">
+    <div>
+      <div class="pc-hero-title">&#x1F4F8; Crew Photo Checklist</div>
+      <div class="pc-hero-sub">Required photos must be uploaded before crew pay is released. Missing required photos = pay on hold.</div>
+    </div>
+    <button class="btn btn-primary" onclick="exportPhotoReport()" style="white-space:nowrap;font-weight:700;padding:10px 20px;border-radius:9px;">
+      &#x1F4C4; Export Report
+    </button>
+  </div>
+
+  <!-- ══ ROLE SWITCHER ══ -->
+  <div class="role-switcher-row">
+    <div class="role-switcher-label">Viewing As:</div>
+    <div class="role-switcher-group">
+      <button id="role-btn-all" class="role-switcher-btn active" onclick="setPCRole('all')">👁 All Phases</button>
+      <button id="role-btn-salesman" class="role-switcher-btn" onclick="setPCRole('salesman')">🤝 Salesman</button>
+      <button id="role-btn-crew_lead" class="role-switcher-btn" onclick="setPCRole('crew_lead')">🔨 Crew Lead</button>
+    </div>
+  </div>
+
+  <!-- SALESMAN BANNER -->
+  <div id="salesman-banner" style="display:none;background:linear-gradient(135deg,#0e4d2e,#166534);border:1px solid #16a34a;border-radius:10px;padding:14px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#4ade80;margin-bottom:4px;">📸 Salesman Photo Mode</div>
+    <div style="font-size:12px;color:#86efac;">Your two responsibilities: <strong>Pre-Work (before tear-off)</strong> and <strong>Completion / Final Inspection</strong>. Each upload is automatically labeled with your name and timestamp.</div>
+  </div>
+
+  <!-- CREW BANNER -->
+  <div id="crew-banner" style="display:none;background:linear-gradient(135deg,#431407,#7c2d12);border:1px solid #ea580c;border-radius:10px;padding:14px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#fb923c;margin-bottom:4px;">🔨 Crew Lead Photo Mode</div>
+    <div style="font-size:12px;color:#fdba74;">Your two responsibilities: <strong>During Tear-Off</strong> and <strong>Installation in Progress</strong>. These photos document your work and are required before pay is released.</div>
+  </div>
+
+  <!-- ══ JOB TYPE SELECTOR ══ -->
+  <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Job Type</div>
+  <div class="type-selector" id="pc-type-selector">
+    ${Object.entries(PHOTO_CHECKLISTS).map(([key,val]) => `
+      <div class="type-btn ${pcState.jobType===key?'active':''}" onclick="setPCJobType('${key}')">
+        <span>${val.icon}</span><span>${val.label}</span>
+      </div>`).join('')}
+  </div>
+
+  <!-- ══ JOB INFO GRID ══ -->
+  <div class="pc-job-bar">
+    <div>
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Homeowner Name</label>
+      <input class="form-input" id="pc-homeowner" value="${pcState.homeowner}" placeholder="First Last" oninput="pcState.homeowner=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
+    </div>
+    <div>
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Property Address</label>
+      <input class="form-input" id="pc-address" value="${pcState.address}" placeholder="123 Main St, St. Louis MO" oninput="pcState.address=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
+    </div>
+    <div>
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Job # (JN)</label>
+      <input class="form-input" id="pc-jobnum" value="${pcState.jobNum}" placeholder="4990" oninput="pcState.jobNum=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
+    </div>
+    <div>
+      <label class="form-label" style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block;">Crew / Foreman</label>
+      <input class="form-input" id="pc-crew" value="${pcState.crew||''}" placeholder="Foreman name" oninput="pcState.crew=this.value" style="font-size:15px;font-weight:700;color:#0f172a;" />
+    </div>
+  </div>
+
+  <!-- ══ PROGRESS STAT CARDS ══ -->
+  <div class="pc-summary-grid" id="pc-summary"></div>
+
+  <!-- ══ PAY HOLD BANNER ══ -->
+  <div class="pay-hold-banner" id="pc-pay-hold" style="display:none;">
+    <div class="pay-hold-icon">&#x1F512;</div>
+    <div>
+      <div class="pay-hold-title">PAY HOLD — Required Photos Missing</div>
+      <div class="pay-hold-sub" id="pc-pay-hold-msg">Complete all required photos to release crew pay.</div>
+    </div>
+  </div>
+
+  <!-- ══ CHECKLIST SECTIONS ══ -->
+  <div id="pc-checklist-body"></div>
+
+  <!-- ══ SUBMIT ══ -->
+  <div style="margin-top:28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <button class="submit-review-btn" onclick="submitPhotoChecklist()">&#x2705; Submit for Review</button>
+    <button class="btn btn-ghost" onclick="clearPhotoChecklist()" style="font-weight:700;">&#x1F5D1; Clear &amp; Start Over</button>
+    <span style="font-size:12px;color:#64748b;" id="pc-submit-status"></span>
+  </div>
+  `;
+
+  renderPCChecklist();
+  updatePCSummary();
+}
+
+function setPCJobType(key) {
+  pcState.jobType = key;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.type-btn').forEach(b => {
+    if (b.textContent.trim().includes(PHOTO_CHECKLISTS[key].label)) b.classList.add('active');
+  });
+  renderPCChecklist();
+  updatePCSummary();
+}
+
+function renderPCChecklist() {
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  if (!checklist) return;
+  const body = document.getElementById('pc-checklist-body');
+  if (!body) return;
+
+  // Filter sections by role
+  const visibleSections = pcState.role === 'all'
+    ? checklist.sections
+    : checklist.sections.filter(s => s.role === pcState.role);
+
+  const ROLE_LABELS = {
+    salesman: { label: '🤝 SALESMAN', bg: '#15803d', text: '#4ade80' },
+    crew_lead: { label: '🔨 CREW LEAD', bg: '#c2410c', text: '#fb923c' },
+  };
+
+  body.innerHTML = visibleSections.map(section => {
+    const roleTag = ROLE_LABELS[section.role];
+    const roleBadge = roleTag
+      ? `<span style="font-size:10px;font-weight:800;padding:2px 9px;border-radius:10px;background:${roleTag.bg};color:${roleTag.text};margin-left:8px;white-space:nowrap;">${roleTag.label}</span>`
+      : '';
+    return `
+    <div class="pc-section" data-role="${section.role||'all'}">
+      <div class="pc-section-hdr" style="background:${section.color}22;border:1px solid ${section.color}44;border-bottom:none">
+        <div style="width:10px;height:10px;border-radius:50%;background:${section.color};flex-shrink:0"></div>
+        <div class="pc-section-title" style="color:${section.color}">${section.title}</div>
+        ${roleBadge}
+        <div class="pc-section-count" style="background:${section.color}33;color:${section.color}" id="count-${section.id}">
+          ${countSectionDone(section.id, section.items)} / ${section.items.length}
+        </div>
+        <div style="flex:1"></div>
+        <div class="pc-progress-bar-wrap" style="flex:0 0 100px">
+          <div class="pc-progress-bar" id="bar-${section.id}"
+               style="width:${Math.round(countSectionDone(section.id,section.items)/section.items.length*100)}%;background:${section.color}"></div>
+        </div>
+      </div>
+      <div class="pc-items">
+        ${section.items.map(item => renderPCItem(item, section)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setPCRole(role) {
+  pcState.role = role;
+  // Update toggle button styles
+  ['all','salesman','crew_lead'].forEach(r => {
+    const btn = document.getElementById('role-btn-' + r);
+    if (!btn) return;
+    if (r === role) {
+      btn.style.background = r === 'salesman' ? '#15803d' : r === 'crew_lead' ? '#c2410c' : 'var(--blue)';
+      btn.style.color = '#fff';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text2)';
+    }
+  });
+  // Show/hide banners
+  const sb = document.getElementById('salesman-banner');
+  const cb = document.getElementById('crew-banner');
+  if (sb) sb.style.display = role === 'salesman' ? 'block' : 'none';
+  if (cb) cb.style.display = role === 'crew_lead' ? 'block' : 'none';
+  renderPCChecklist();
+  updatePCSummary();
+}
+
+function renderPCItem(item, section) {
+  const photo = pcState.photos[item.id];
+  const isDone = !!photo;
+  return `
+    <div class="pc-item" id="pcitem-${item.id}" style="${isDone ? 'border:2px solid #15803D;background:#F0FDF4;' : ''}">
+
+      <!-- LEFT: checkbox dot -->
+      <div class="pc-status-dot ${isDone?'done':''}" onclick="togglePCItem('${item.id}','${section.id}')"
+           title="${isDone?'Done - click to remove photo':'Tap to upload photo'}" style="flex-shrink:0">
+        ${isDone ? '&#10003;' : ''}
+      </div>
+
+      <!-- CENTER: label + desc + thumbnail when done -->
+      <div style="flex:1;min-width:0">
+        <div class="pc-item-label" style="${isDone?'color:#15803D;':''}">
+          ${isDone ? '<span style="font-size:15px;margin-right:4px">&#9989;</span>' : ''}
+          ${item.label}
+          ${item.required ? '<span class="pc-required-badge">REQUIRED</span>' : '<span style="font-size:10px;color:var(--text2);margin-left:6px">(optional)</span>'}
+        </div>
+        <div class="pc-item-desc">${item.desc}</div>
+        ${item.tip ? `<div class="pc-item-tip">&#128161; ${item.tip}</div>` : ''}
+
+        ${isDone && photo && photo.dataUrl ? `
+          <!-- PHOTO PREVIEW inline under label -->
+          <div style="margin-top:8px;display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
+            <div style="position:relative;display:inline-block">
+              <img src="${photo.dataUrl}"
+                   onclick="viewPhoto('${item.id}')"
+                   style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid #15803D;cursor:pointer;display:block"
+                   title="Tap to view full size" />
+              <!-- Green checkmark badge on photo -->
+              <div style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:#15803D;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid #fff">&#10003;</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;font-weight:700;color:#15803D;margin-bottom:3px">&#9989; Photo captured
+                ${photo.takenBy ? `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border-radius:8px;background:${photo.roleColor||'#1e3a5f'};font-size:10px;font-weight:700;color:#fff;">${photo.takenByRole==='Salesman'?'🤝':'🔨'} ${photo.takenBy}</span>` : ''}
+              </div>
+              <input class="photo-note-input" placeholder="Add a note (optional)..."
+                     value="${photo.note||''}"
+                     onchange="setPhotoNote('${item.id}',this.value)"
+                     style="width:100%;font-size:12px" />
+              <button onclick="removePhoto('${item.id}','${section.id}')"
+                      style="background:none;border:none;color:var(--red);cursor:pointer;font-size:11px;padding:0;margin-top:4px;font-weight:600">
+                &#10005; Remove &amp; retake
+              </button>
+            </div>
+          </div>
+        ` : `
+          <label class="photo-upload-btn" for="upload-${item.id}" style="margin-top:8px;display:inline-flex">
+            &#128247; Take / Upload Photo
+          </label>
+          <input type="file" id="upload-${item.id}" accept="image/*" capture="environment"
+                 style="display:none" onchange="handlePhotoUpload(this,'${item.id}','${section.id}')" />
+          <div style="display:none">
+            <input class="photo-note-input" value="" onchange="setPhotoNote('${item.id}',this.value)" />
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function countSectionDone(sectionId, items) {
+  return items.filter(i => !!pcState.photos[i.id]).length;
+}
+
+function handlePhotoUpload(input, itemId, sectionId) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    // Determine who took this photo based on section role
+    const sectionRole = (() => {
+      const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+      if (!checklist) return null;
+      const sec = checklist.sections.find(s => s.id === sectionId);
+      return sec ? sec.role : null;
+    })();
+    const takerName = sectionRole === 'salesman'
+      ? (state.user ? state.user.full_name : 'Salesman')
+      : sectionRole === 'crew_lead'
+        ? (pcState.crew || 'Crew Lead')
+        : (state.user ? state.user.full_name : 'Unknown');
+    pcState.photos[itemId] = {
+      file,
+      dataUrl: e.target.result,
+      note: '',
+      ts: new Date().toISOString(),
+      takenBy: takerName,
+      takenByRole: sectionRole === 'salesman' ? 'Salesman' : sectionRole === 'crew_lead' ? 'Crew Lead' : 'Unknown',
+      roleColor: sectionRole === 'salesman' ? '#15803d' : sectionRole === 'crew_lead' ? '#c2410c' : '#1e6fff',
+    };
+    refreshPCItem(itemId, sectionId);
+    updatePCSummary();
+    updateSectionProgress(sectionId);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(itemId, sectionId) {
+  delete pcState.photos[itemId];
+  refreshPCItem(itemId, sectionId);
+  updatePCSummary();
+  updateSectionProgress(sectionId);
+}
+
+function setPhotoNote(itemId, note) {
+  if (pcState.photos[itemId]) pcState.photos[itemId].note = note;
+}
+
+function togglePCItem(itemId, sectionId) {
+  // If no photo, just trigger file upload
+  const input = document.getElementById('upload-' + itemId);
+  if (input && !pcState.photos[itemId]) { input.click(); return; }
+  // If already has photo, remove it
+  if (pcState.photos[itemId]) { removePhoto(itemId, sectionId); }
+}
+
+function viewPhoto(itemId) {
+  const photo = pcState.photos[itemId];
+  if (!photo || !photo.dataUrl) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = () => overlay.remove();
+  overlay.innerHTML = `
+    <div class="photo-modal" onclick="event.stopPropagation()">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:14px">${itemId.replace(/_/g,' ')}</span>
+        <button onclick="this.closest('.modal-overlay').remove()" 
+                style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer">&#xD7;</button>
+      </div>
+      <div style="padding:16px">
+        <img src="${photo.dataUrl}" style="width:100%;border-radius:8px;margin-bottom:10px" />
+        ${photo.note ? `<div style="font-size:12.5px;color:var(--text2);font-style:italic">Note: ${photo.note}</div>` : ''}
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">Uploaded: ${new Date(photo.ts).toLocaleString()}</div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function refreshPCItem(itemId, sectionId) {
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  let foundItem = null, foundSection = null;
+  checklist.sections.forEach(s => {
+    s.items.forEach(i => { if (i.id === itemId) { foundItem = i; foundSection = s; } });
+  });
+  if (!foundItem) return;
+  const el = document.getElementById('pcitem-' + itemId);
+  if (el) el.outerHTML = renderPCItem(foundItem, foundSection);
+}
+
+function updateSectionProgress(sectionId) {
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  const section = checklist.sections.find(s => s.id === sectionId);
+  if (!section) return;
+  const done = countSectionDone(sectionId, section.items);
+  const total = section.items.length;
+  const pct = Math.round(done / total * 100);
+  const countEl = document.getElementById('count-' + sectionId);
+  const barEl = document.getElementById('bar-' + sectionId);
+  if (countEl) countEl.textContent = `${done} / ${total}`;
+  if (barEl) barEl.style.width = pct + '%';
+}
+
+function updatePCSummary() {
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  let totalRequired = 0, doneRequired = 0, totalOptional = 0, doneOptional = 0;
+  checklist.sections.forEach(s => {
+    s.items.forEach(i => {
+      if (i.required) { totalRequired++; if (pcState.photos[i.id]) doneRequired++; }
+      else { totalOptional++; if (pcState.photos[i.id]) doneOptional++; }
+    });
+  });
+  const total = totalRequired + totalOptional;
+  const done = doneRequired + doneOptional;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  const missingRequired = totalRequired - doneRequired;
+
+  const summaryEl = document.getElementById('pc-summary');
+  if (summaryEl) summaryEl.innerHTML = `
+    <div class="pc-stat">
+      <div class="pc-stat-label">Required Done</div>
+      <div class="pc-stat-val" style="color:${doneRequired===totalRequired?'#16a34a':'#dc2626'};font-size:2.5rem;">${doneRequired}/${totalRequired}</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${totalRequired>0?Math.round(doneRequired/totalRequired*100):0}%;background:${doneRequired===totalRequired?'#16a34a':'#dc2626'}"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pc-stat">
+      <div class="pc-stat-label">Optional Done</div>
+      <div class="pc-stat-val" style="color:#64748b;font-size:2.5rem;">${doneOptional}/${totalOptional}</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${totalOptional>0?Math.round(doneOptional/totalOptional*100):0}%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pc-stat">
+      <div class="pc-stat-label">Total Uploaded</div>
+      <div class="pc-stat-val" style="color:#2563eb;font-size:2.5rem;">${done}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px;">of ${total} total photos</div>
+    </div>
+    <div class="pc-stat">
+      <div class="pc-stat-label">Completion</div>
+      <div class="pc-stat-val" style="color:${pct===100?'#16a34a':pct>60?'#d97706':'#dc2626'};font-size:2.5rem;">${pct}%</div>
+      <div style="margin-top:8px;">
+        <div class="pc-progress-bar-wrap">
+          <div class="pc-progress-bar" style="width:${pct}%"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const payHold = document.getElementById('pc-pay-hold');
+  const payHoldMsg = document.getElementById('pc-pay-hold-msg');
+  if (payHold) {
+    payHold.style.display = missingRequired > 0 ? 'flex' : 'none';
+    if (payHoldMsg) payHoldMsg.textContent = `${missingRequired} required photo${missingRequired===1?'':'s'} missing — crew pay is on hold until all required photos are uploaded and verified by Austin.`;
+  }
+}
+</script>
 </body>
 </html>
