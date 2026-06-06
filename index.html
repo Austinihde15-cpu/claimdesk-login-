@@ -1304,6 +1304,7 @@ input[type=file] { display: none; }
 </div>
 
 <script>
+
 // ===========================================================
 //  STATE
 // ===========================================================
@@ -2502,12 +2503,13 @@ function renderClaimDetail(data) {
 
   document.getElementById('content').innerHTML = `
     <!-- BREADCRUMB + BACK -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button class="btn btn-ghost btn-sm" onclick="goto('claims')"><- Back to Claims</button>
-      <span class="text-muted">|</span>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="goto('claims')">&#x2190; Back to Claims</button>
+      <span class="text-muted" style="color:var(--border)">|</span>
       <span class="text-sm text-muted">#${c.job_number||'--'} &middot; ${c.address||'--'}</span>
-      <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${statusBadge(c.status)} ${priorityBadge(c.priority)}
+        <button class="btn btn-primary btn-sm" style="background:linear-gradient(135deg,#1345A8,#1e6fff);font-weight:800" onclick="openDocBuilderForJob('${c.id}')">&#x1F4DD; Build Doc</button>
       </div>
     </div>
 
@@ -4437,8 +4439,27 @@ function showTutorialModal() {
     buildLoginScreen();
   }
 })();
+
+
+// ─── In-Job Doc Builder launcher ───────────────────────────────────────────
+function openDocBuilderForJob(claimId) {
+  // Reset doc builder state but keep tab preference
+  window._dbState = {
+    tab: 'estimate',
+    lines: [],
+    moLines: [],
+    woLines: [],
+    job: null,
+    blankMode: false,
+    preloadJobId: claimId,
+    _fromJobView: true,
+  };
+  goto('docbuilder');
+}
+
 </script>
 <script>
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT BUILDER v3 — Complete Rewrite  June 2026
 //  Cox Roofing & Restoration | MOSL8X | STL 2026 Pricing
@@ -4942,77 +4963,137 @@ function renderDBInner() {
 // JOB LOADING
 // ─────────────────────────────────────────────────────────────────────────────
 async function dbLoadJobs() {
-  const sel = document.getElementById('db-job-dropdown');
+  const sel    = document.getElementById('db-job-dropdown');
   const status = document.getElementById('db-job-status');
   if (!sel) return;
-  sel.innerHTML = '<option value="">⏳ Loading jobs from JobNimbus...</option>';
-  if (status) status.textContent = '';
+
+  sel.innerHTML = '<option value="">⏳ Loading jobs…</option>';
+  if (status) status.innerHTML = '';
 
   try {
-    // Load from our claims entity (synced from JN)
-    const r = await callFunction('entityFetch', { entity: 'Claim', action: 'list' });
-    const claims = (r.records || []).filter(c => c.insured_name || c.address);
+    // ── Parallel fetch: all claims + all doc-type attachments ──────────────
+    const [claimRes, attRes] = await Promise.all([
+      callFunction('entityFetch', { entity: 'Claim',      action: 'list', limit: 500 }),
+      callFunction('entityFetch', { entity: 'Attachment', action: 'list', limit: 500 })
+    ]);
 
-    // Sort alphabetically by insured_name or address
-    claims.sort((a, b) => {
-      const na = (a.insured_name || a.address || '').toLowerCase();
-      const nb = (b.insured_name || b.address || '').toLowerCase();
-      return na < nb ? -1 : na > nb ? 1 : 0;
+    const allClaims = (claimRes.records  || []).filter(c => c && (c.insured_name || c.address));
+    const allAtts   = (attRes.records    || []);
+
+    // ── Build set of claim_ids that already have an Estimate, MO, or WO ───
+    const DOC_TYPES = new Set(['estimate', 'material_order', 'work_order']);
+    const claimsWithDocs = new Set();
+    allAtts.forEach(a => {
+      const dt = (a.document_type || '').toLowerCase().trim();
+      if (DOC_TYPES.has(dt) && a.claim_id) claimsWithDocs.add(a.claim_id);
     });
 
-    if (!claims.length) {
-      sel.innerHTML = '<option value="">No jobs found</option>';
-      if (status) status.textContent = 'No jobs found. Sync from JobNimbus first.';
+    // ── Filter to only eligible jobs ───────────────────────────────────────
+    const eligible = allClaims.filter(c => !claimsWithDocs.has(c.id));
+
+    // ── Alphabetical by address, then name ────────────────────────────────
+    eligible.sort((a, b) => {
+      const ka = (a.address || a.insured_name || '').toLowerCase();
+      const kb = (b.address || b.insured_name || '').toLowerCase();
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+
+    if (!eligible.length) {
+      sel.innerHTML = '<option value="">No eligible jobs found</option>';
+      if (status) status.innerHTML =
+        '<span style="color:var(--orange)">&#x26A0; All jobs already have documents. ' +
+        '<a href="#" onclick="dbUseBlankJob();return false" style="color:var(--primary)">Create a blank document instead.</a></span>';
       return;
     }
 
-    const opts = ['<option value="">-- Select a Job --</option>'];
-    claims.forEach(c => {
-      const label = `${c.insured_name || 'Unknown'} — ${c.address || ''}${c.city ? ', '+c.city : ''} ${c.job_number ? '#'+c.job_number : ''}`.trim();
+    // ── Build options: "Address — Name (JN#XXXX)" ─────────────────────────
+    const opts = ['<option value="">— Select a Job —</option>'];
+    eligible.forEach(c => {
+      const addr  = c.address ? c.address.replace(/,\s*/, ', ') : '';
+      const name  = c.insured_name || '';
+      const jn    = c.job_number   ? '#' + c.job_number : '';
+      const city  = c.city         ? ', ' + c.city      : '';
+      // Format: "Address, City — Name (JN#)"
+      let label = addr ? addr + city : name;
+      if (addr && name)  label += ' — ' + name;
+      if (jn)            label += ' (' + jn + ')';
       opts.push(`<option value="${c.id}">${label}</option>`);
     });
     sel.innerHTML = opts.join('');
 
-    if (status) status.textContent = `${claims.length} jobs loaded. Select one above.`;
+    const already = allClaims.length - eligible.length;
+    if (status) {
+      status.innerHTML =
+        `<span style="color:var(--green)">&#x2714; ${eligible.length} eligible job${eligible.length===1?'':'s'}</span>` +
+        (already > 0 ? ` <span style="color:var(--text2)">&nbsp;&middot;&nbsp;${already} already have documents (hidden)</span>` : '');
+    }
 
-    // If preload ID set, auto-select it
-    if (window._dbState && window._dbState.preloadJobId) {
-      sel.value = window._dbState.preloadJobId;
-      if (sel.value) dbSelectJob(window._dbState.preloadJobId);
+    // ── Auto-select if a preload ID was requested ─────────────────────────
+    const preId = window._dbState && window._dbState.preloadJobId;
+    if (preId) {
+      // Allow preloading even if job already has docs (in-job context)
+      const allOpts = allClaims;
+      const match = allOpts.find(c => c.id === preId);
+      if (match) {
+        // Add it if not already in dropdown
+        if (!eligible.find(c => c.id === preId)) {
+          const addr  = match.address    ? match.address + (match.city ? ', '+match.city : '') : '';
+          const name  = match.insured_name || '';
+          const jn    = match.job_number  ? '#'+match.job_number : '';
+          let label = addr || name;
+          if (addr && name) label += ' — ' + name;
+          if (jn) label += ' (' + jn + ')';
+          const opt = document.createElement('option');
+          opt.value = preId;
+          opt.textContent = label + ' [Current Job]';
+          sel.insertBefore(opt, sel.children[1]);
+        }
+        sel.value = preId;
+        if (sel.value === preId) dbSelectJob(preId);
+      }
     }
 
   } catch(e) {
     sel.innerHTML = '<option value="">Error loading jobs</option>';
-    if (status) status.innerHTML = '<span style="color:var(--red)">&#x274C; '+e.message+'</span>';
+    if (status) status.innerHTML =
+      '<span style="color:var(--red)">&#x274C; ' + (e.message || 'Network error') +
+      '. <a href="#" onclick="dbLoadJobs();return false" style="color:var(--primary)">Retry</a></span>';
   }
 }
 
 async function dbSelectJob(id) {
   if (!id) return;
   const status = document.getElementById('db-job-status');
-  if (status) status.innerHTML = '<span>&#x23F3; Loading job details...</span>';
+  if (status) status.innerHTML = '<span>&#x23F3; Loading job details…</span>';
 
   try {
     const r = await callFunction('entityFetch', { entity: 'Claim', action: 'get', id });
     const claim = r.record || {};
 
-    window._dbState.job = claim;
-    window._dbState.blankMode = false;
-    window._dbState.tab = window._dbState.tab || 'estimate';
+    window._dbState.job        = claim;
+    window._dbState.blankMode  = false;
+    window._dbState.preloadJobId = null; // clear after use
 
-    // Pre-populate doc state from claim
-    window._dbState.jobName = claim.insured_name || '';
-    window._dbState.jobAddr = claim.address || '';
-    window._dbState.jobNum  = claim.job_number || '';
-    window._dbState.carrier = claim.carrier || '';
-    window._dbState.claimNum = claim.claim_number || '';
+    // ── Pre-populate all tab fields from claim ────────────────────────────
+    window._dbState.jobName  = claim.insured_name  || '';
+    window._dbState.jobAddr  = (claim.address || '') + (claim.city ? ', ' + claim.city : '') + (claim.state ? ' ' + claim.state : '') + (claim.zip ? ' ' + claim.zip : '');
+    window._dbState.jobNum   = claim.job_number    || '';
+    window._dbState.carrier  = claim.carrier       || '';
+    window._dbState.claimNum = claim.claim_number  || '';
     window._dbState.adjEmail = claim.adjuster_email || '';
-    window._dbState.adjName  = claim.adjuster_name || '';
-    window._dbState.dol      = claim.date_of_loss || '';
+    window._dbState.adjName  = claim.adjuster_name  || '';
+    window._dbState.dol      = claim.date_of_loss   || '';
+    window._dbState.phone    = claim.insured_phone  || claim.phone || '';
+    window._dbState.email    = claim.insured_email  || claim.email || '';
+    window._dbState.policyNum = claim.policy_number || '';
+
+    // Keep tab selection, reset line items for a fresh doc
+    window._dbState.tab      = window._dbState.tab || 'estimate';
 
     renderDBInner();
   } catch(e) {
-    if (status) status.innerHTML = '<span style="color:var(--red)">&#x274C; '+e.message+'</span>';
+    if (status) status.innerHTML =
+      '<span style="color:var(--red)">&#x274C; ' + (e.message || 'Error') + '</span>';
   }
 }
 
@@ -5036,18 +5117,21 @@ function dbField(id, fallback) {
 
 function dbJobHeader() {
   const DS = window._dbState || {};
-  const j = DS.job || {};
+  const j  = DS.job || {};
   const today = new Date().toISOString().slice(0, 10);
   return {
-    owner:    DS.jobName || j.insured_name || '',
-    addr:     DS.jobAddr || j.address || '',
-    jobNum:   DS.jobNum  || j.job_number || '',
-    date:     today,
-    carrier:  DS.carrier || j.carrier || '',
-    claimNum: DS.claimNum || j.claim_number || '',
-    adjName:  DS.adjName  || j.adjuster_name || '',
-    adjEmail: DS.adjEmail || j.adjuster_email || '',
-    dol:      DS.dol      || j.date_of_loss || '',
+    owner:     DS.jobName   || j.insured_name   || '',
+    addr:      DS.jobAddr   || ((j.address||'') + (j.city?', '+j.city:'') + (j.state?' '+j.state:'') + (j.zip?' '+j.zip:'')).trim() || '',
+    jobNum:    DS.jobNum    || j.job_number      || '',
+    date:      today,
+    carrier:   DS.carrier   || j.carrier         || '',
+    claimNum:  DS.claimNum  || j.claim_number    || '',
+    adjName:   DS.adjName   || j.adjuster_name   || '',
+    adjEmail:  DS.adjEmail  || j.adjuster_email  || '',
+    dol:       DS.dol       || j.date_of_loss    || '',
+    phone:     DS.phone     || j.insured_phone   || j.phone  || '',
+    email:     DS.email     || j.insured_email   || j.email  || '',
+    policyNum: DS.policyNum || j.policy_number   || '',
   };
 }
 
@@ -5801,6 +5885,7 @@ function copyEstimateText(asMO) {
   }
   navigator.clipboard.writeText(text).then(() => showToast('\u2705 Copied to clipboard!', 'success'));
 }
+
 
 
 </script>
