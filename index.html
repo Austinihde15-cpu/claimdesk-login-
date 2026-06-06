@@ -1919,11 +1919,12 @@ async function callFunction(name, payload = {}) {
 
 async function entityList(entity, query = {}) {
   try {
-    const res = await callFunction('entityFetch', { entity, query, limit: 500 });
+    const res = await callFunction('entityFetch', { entity, action: 'list', query });
     if (res && res.ok) return res.records || [];
+    showToast('⚠️ Could not load ' + entity + ' data — retrying...', 'warning');
     return [];
   } catch (e) {
-    // silent fail — entity unavailable
+    console.error('entityList error:', entity, e.message);
     return [];
   }
 }
@@ -1964,7 +1965,7 @@ function goto(page, param) {
   const titles = { dashboard:'Dashboard', claims:'Claims', tasks:'Tasks', calendar:'Calendar', settings:'Settings', docbuilder:'Document Builder', photochecklist:'Crew Photo Checklist' };
   document.getElementById('topbar-title').textContent = titles[page] || 'ClaimDesk';
   if (page === 'dashboard') loadDashboard();
-  else if (page === 'claims') renderClaimsPage();
+  else if (page === 'claims') renderClaimsPage().catch(e => showToast('Failed to load claims: ' + e.message, 'danger'));
   else if (page === 'tasks') loadTasksPage();
   else if (page === 'settings') { renderSettingsPage(); setTimeout(loadSettingsTabData, 100); }
   else if (page === 'docbuilder') renderDocBuilderPage();
@@ -2322,8 +2323,13 @@ async function loadDashboard() {
 // ===========================================================
 //  CLAIMS PAGE
 // ===========================================================
-function renderClaimsPage(filter = '') {
-  const claims = state.claims.length ? state.claims : [];
+async function renderClaimsPage(filter = '') {
+  // If claims not loaded yet (direct nav to Claims tab), fetch them now
+  if (!state.claims || !state.claims.length) {
+    document.getElementById('content').innerHTML = `<div class="empty-state"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto"></div><p style="margin-top:12px;color:var(--text2)">Loading claims...</p></div>`;
+    state.claims = await entityList('Claim');
+  }
+  const claims = state.claims || [];
   const filtered = filter ? claims.filter(c => (c.status_name||c.status||'').toLowerCase() === filter.toLowerCase() || (c.status||'').replace(/_/g,' ').toLowerCase() === filter.toLowerCase()) : claims;
   const sorted = [...filtered].sort((a,b) => (b.stall_score||0) - (a.stall_score||0));
 
