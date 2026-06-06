@@ -8200,8 +8200,13 @@ function switchDocTab(tab) {
 // ============================================================
 // ACTIVITY FEED — JN-style timeline for each claim/job
 // ============================================================
-const _JN_KEY = 'mpff324muku81lq3';
-const _JN_BASE = 'https://app.jobnimbus.com/api1';
+// JN API calls now route through jnProxy backend (key stays server-side)
+const _JN_BASE = 'https://app.jobnimbus.com/api1'; // kept for reference only
+async function jnProxyFetch(endpoint) {
+  const r = await callFunction('jnProxy', { endpoint });
+  if (!r.ok) throw new Error(r.error || 'JN proxy error');
+  return r.data;
+}
 
 const ACTIVITY_ICONS = {
   'Job Created':         { icon: '&#x2795;',     color: '#22c55e', bg: '#dcfce7' },
@@ -8247,10 +8252,7 @@ async function loadJobActivity(jobJnid, containerId) {
   el.innerHTML = '<div class="activity-loading"><div class="spinner-sm"></div><span>Loading activity from JobNimbus...</span></div>';
 
   try {
-    const r1 = await fetch(`${_JN_BASE}/activities?related=${jobJnid}&limit=100&fields=jnid,date_created`, {
-      headers: { 'Authorization': `Bearer ${_JN_KEY}` }
-    });
-    const d1 = await r1.json();
+    const d1 = await jnProxyFetch(`/activities?related=${jobJnid}&limit=100&fields=jnid,date_created`);
     const items = (d1.activity || d1.results || []).slice(0, 60);
 
     if (!items.length) {
@@ -8261,10 +8263,7 @@ async function loadJobActivity(jobJnid, containerId) {
     // Fetch all individually (JN API quirk — list returns jnids only)
     const acts = await Promise.all(items.map(async item => {
       try {
-        const r = await fetch(`${_JN_BASE}/activities/${item.jnid}`, {
-          headers: { 'Authorization': `Bearer ${_JN_KEY}` }
-        });
-        return await r.json();
+        return await jnProxyFetch(`/activities/${item.jnid}`);
       } catch { return null; }
     }));
 
@@ -8343,10 +8342,9 @@ async function submitJobNote(jobJnid, containerId) {
   const text = (document.getElementById('_new-note-text')?.value || '').trim();
   if (!text) { showToast('Note cannot be empty.', 'error'); return; }
   try {
-    const r = await fetch(`${_JN_BASE}/activities`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${_JN_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type:'activity', note: text, related: [{ id: jobJnid, type:'job' }] })
+    const r = await callFunction('jnProxy', { endpoint: '/activities', method: 'POST', body: { type:'activity', note: text, related: [{ id: jobJnid, type:'job' }] } });
+    // Fake a Response-like object for compatibility
+    const _fakeR = { ok: r.ok !== false
     });
     if (!r.ok) throw new Error('JN error ' + r.status);
     document.getElementById('_add-note-modal')?.remove();
