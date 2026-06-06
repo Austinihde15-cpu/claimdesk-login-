@@ -2481,7 +2481,7 @@ async function openClaimDetail(id) {
       return;
     }
     state.currentClaim = c;
-    document.getElementById('topbar-title').textContent = \`\${c.insured_name || 'Claim'} #\${c.job_number || ''}\`;
+    document.getElementById('topbar-title').textContent = (c.insured_name || 'Claim') + ' #' + (c.job_number || '');
     renderClaimDetail(data);
   } catch(e) {
     document.getElementById('content').innerHTML = `<div class="empty-state"><p style="color:var(--red);margin-bottom:12px">&#x274C; Failed to load claim: \${e.message}</p><button class="btn btn-primary btn-sm" onclick="openClaimDetail('\${id}')">&#x21BA; Retry</button>&nbsp;<button class="btn btn-ghost btn-sm" onclick="goto('claims')">&#x2190; Back</button></div>`;
