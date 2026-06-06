@@ -1911,21 +1911,27 @@ async function entityList(entity, query = {}) {
 
 
 async function entityCreate(entity, data) {
-  const res = await fetch(`${BASE_URL}/entities/${entity}`, {
-    method: 'POST', credentials: 'omit',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  const res = await callFunction('entityFetch', { entity, action: 'create', data });
+  if (!res || !res.ok) throw new Error(res?.error || 'Create failed');
+  return res.record;
+}
+
+async function entityGet(entity, id) {
+  const res = await callFunction('entityFetch', { entity, action: 'get', id });
+  if (!res || !res.ok) throw new Error(res?.error || 'Get failed');
+  return res.record;
 }
 
 async function entityUpdate(entity, id, data) {
-  const res = await fetch(`${BASE_URL}/entities/${entity}/${id}`, {
-    method: 'PUT', credentials: 'omit',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  const res = await callFunction('entityFetch', { entity, action: 'update', id, data });
+  if (!res || !res.ok) throw new Error(res?.error || 'Update failed');
+  return res.record;
+}
+
+async function entityDelete(entity, id) {
+  const res = await callFunction('entityFetch', { entity, action: 'delete', id });
+  if (!res || !res.ok) throw new Error(res?.error || 'Delete failed');
+  return true;
 }
 
 // ===========================================================
