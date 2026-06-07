@@ -1701,7 +1701,7 @@ function updateSidebarUser(){
     <div style="display:flex;align-items:center;gap:9px;">
       <div style="width:30px;height:30px;background:linear-gradient(135deg,#b91c1c,#1345a8);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;color:#fff;">${u.full_name?u.full_name[0].toUpperCase():'?'}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.full_name}</div>
+        <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.full_name||""}</div>
         <div style="font-size:10px;color:rgba(255,255,255,0.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
       </div>
       ${getPlanBadge(c.plan)}
@@ -1716,7 +1716,7 @@ function showUserMenu(){
   openModal('Account',`
     <div style="padding:4px 0;">
       <div style="margin-bottom:14px;padding:12px;background:var(--navy3);border-radius:8px;">
-        <div style="font-size:14px;font-weight:600;">${u?.full_name}</div>
+        <div style="font-size:14px;font-weight:600;">${u?.full_name||""}</div>
         <div style="font-size:12px;color:var(--text2);">${u?.email}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:2px;">${c?.name} &middot; ${u?.role}</div>
         <div style="margin-top:8px;">${getPlanBadge(c?.plan)} <span style="font-size:11px;color:var(--text2);margin-left:6px;">${c?.plan_status}</span></div>
@@ -1795,7 +1795,7 @@ async function showTeamManager(){
     if(!el)return;
     el.innerHTML=users.map(u=>`<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--navy3);border-radius:7px;margin-bottom:5px;">
       <div style="width:28px;height:28px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${u.full_name?u.full_name[0].toUpperCase():'?'}</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${u.full_name}</div><div style="font-size:11px;color:var(--text2);">${u.email} &middot; ${u.role}</div></div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${u.full_name||""}</div><div style="font-size:11px;color:var(--text2);">${u.email} &middot; ${u.role}</div></div>
       <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${u.status==='active'?'rgba(34,197,94,.15)':'rgba(234,179,8,.15)'};color:${u.status==='active'?'#22c55e':'#eab308'};">${u.status}</span>
     </div>`).join('')||'<div style="color:var(--text2);font-size:13px;">No team members.</div>';
   }catch(e){console.error(e);}
@@ -4461,6 +4461,7 @@ function openDocBuilderForJob(claimId) {
 <script>
 
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT BUILDER v3 — Complete Rewrite  June 2026
 //  Cox Roofing & Restoration | MOSL8X | STL 2026 Pricing
@@ -4980,7 +4981,7 @@ function renderDBInner() {
 
   // ── Post-render ───────────────────────────────────────────────────────────
   if (!DS.job && !DS.blankMode) dbLoadJobs();
-  if (DS.tab === 'estimate' ) recalcEst();
+  if (DS.tab === 'estimate' ) { recalcEst(); setTimeout(updateQATrade, 50); }
   if (DS.tab === 'workorder') recalcWO();
   if (DS.tab === 'matorder' ) recalcMO();
 }
@@ -5484,6 +5485,149 @@ function buildWorkOrderTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // ESTIMATE HELPERS (keep existing recalcEst, addBlankLine, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Product Catalog per trade ─────────────────────────────────────────────────
+const QA_PRODUCTS = {
+  roofing_shingles: [
+    { name:'GAF Timberline HDZ SQ',           unit:'SQ', price:105.50 },
+    { name:'GAF Timberline HDZ — Charcoal',   unit:'SQ', price:105.50 },
+    { name:'GAF Timberline HDZ — Barkwood',   unit:'SQ', price:105.50 },
+    { name:'GAF Timberline HDZ — Weathered Wood', unit:'SQ', price:105.50 },
+    { name:'GAF Timberline CS — Charcoal',    unit:'SQ', price:108.00 },
+    { name:'GAF Camelot II CS',               unit:'SQ', price:138.00 },
+    { name:'GAF Royal Sovereign 3-Tab',       unit:'SQ', price: 82.00 },
+    { name:'Owens Corning Duration — Charcoal', unit:'SQ', price:104.00 },
+    { name:'Owens Corning Duration Storm',    unit:'SQ', price:112.00 },
+    { name:'CertainTeed Landmark',            unit:'SQ', price:102.00 },
+    { name:'IKO Cambridge',                   unit:'SQ', price: 98.00 },
+    { name:'Atlas StormMaster Slate',         unit:'SQ', price:118.00 },
+  ],
+  roofing_underlayment: [
+    { name:'Synthetic Underlayment (30#)',        unit:'SQ', price: 12.50 },
+    { name:'GAF FeltBuster Synthetic',            unit:'SQ', price: 14.00 },
+    { name:'GAF WeatherWatch IWS (Ice & Water)',  unit:'SQ', price: 32.00 },
+    { name:'GAF StormGuard IWS',                  unit:'SQ', price: 35.00 },
+    { name:'Henry Blueskin VP160',                unit:'SQ', price: 30.00 },
+  ],
+  roofing_icewater: [
+    { name:'GAF WeatherWatch (2SQ/roll)',  unit:'SQ', price:32.00 },
+    { name:'GAF StormGuard (2SQ/roll)',   unit:'SQ', price:35.00 },
+    { name:'Certainteed WinterGuard',     unit:'SQ', price:33.00 },
+    { name:'Henry Blueskin SA',           unit:'SQ', price:30.00 },
+  ],
+  roofing_ridge: [
+    { name:'GAF Seal-A-Ridge (25LF/pkg)', unit:'LF', price: 3.20 },
+    { name:'GAF TimberTex Premium Ridge', unit:'LF', price: 4.50 },
+    { name:'OC Hip & Ridge',              unit:'LF', price: 3.10 },
+  ],
+  roofing_starter: [
+    { name:'GAF ProStart Starter (120LF/ctn)', unit:'LF', price:1.80 },
+    { name:'GAF WeatherBlocker',               unit:'LF', price:2.10 },
+    { name:'OC Starter Strip Plus',            unit:'LF', price:1.75 },
+  ],
+  roofing_ventilation: [
+    { name:'GAF Cobra Ridge Vent (20LF/roll)', unit:'LF',  price: 4.20 },
+    { name:'Lomanco Off-Ridge Vent',           unit:'EA',  price:28.00 },
+    { name:'Shingle-Over Box Vent (50NFA)',    unit:'EA',  price:22.00 },
+    { name:'Turtle Vent (50NFA)',              unit:'EA',  price:18.00 },
+    { name:'Power Vent (1200CFM)',             unit:'EA',  price:195.00 },
+    { name:'Soffit Vent Strip (8")',           unit:'LF',  price: 3.50 },
+  ],
+  roofing_flashing: [
+    { name:'Step Flashing (4"×4")',       unit:'LF', price: 3.80 },
+    { name:'Pipe Flashing Boot 1.5-3"',   unit:'EA', price:18.00 },
+    { name:'Pipe Flashing Boot 3-4"',     unit:'EA', price:22.00 },
+    { name:'Chimney Flashing (base+counter)', unit:'LF', price:14.00 },
+    { name:'Valley Metal (W-valley 28g)', unit:'LF', price: 4.50 },
+    { name:'Headwall Flashing',           unit:'LF', price: 5.00 },
+  ],
+  roofing_drip_edge: [
+    { name:'Drip Edge 2"×3" (Aluminum)',  unit:'LF', price:1.90 },
+    { name:'Drip Edge 2"×4" (Aluminum)',  unit:'LF', price:2.10 },
+    { name:'Drip Edge (Galvanized)',       unit:'LF', price:1.75 },
+  ],
+  decking: [
+    { name:'7/16" OSB Sheathing (4×8)',  unit:'SF', price:1.85 },
+    { name:'1/2" OSB Sheathing (4×8)',   unit:'SF', price:2.10 },
+    { name:'5/8" Plywood (4×8)',         unit:'SF', price:2.75 },
+  ],
+  gutters: [
+    { name:'5" K-Style Gutter (Aluminum)', unit:'LF',  price: 8.50 },
+    { name:'6" K-Style Gutter (Aluminum)', unit:'LF',  price:10.50 },
+    { name:'3"×4" Downspout',              unit:'LF',  price: 5.50 },
+    { name:'Gutter Helmet (LeafFilter)',   unit:'LF',  price:16.00 },
+    { name:'Screen (Standard)',            unit:'EA',  price: 4.50 },
+    { name:'Gutter Apron Flashing',        unit:'LF',  price: 2.80 },
+  ],
+  labor_roofing: [
+    { name:'Tear-Off Labor (RFG)',         unit:'SQ',  price: 75.95 },
+    { name:'Shingle Install Labor',        unit:'SQ',  price:137.07 },
+    { name:'2-Story Labor Surcharge',      unit:'SQ',  price: 28.00 },
+    { name:'Steep Pitch Surcharge (7:12+)',unit:'SQ',  price: 25.00 },
+    { name:'Chimney Flashing Labor',       unit:'EA',  price:285.00 },
+    { name:'Skylight Flashing Labor',      unit:'EA',  price:195.00 },
+  ],
+  flat_roof: [
+    { name:'EPDM (45mil)',                unit:'SQ', price:195.00 },
+    { name:'TPO (60mil)',                 unit:'SQ', price:215.00 },
+    { name:'Modified Bitumen (2-ply)',    unit:'SQ', price:245.00 },
+    { name:'Flat Roof Tear-Off',          unit:'SQ', price: 65.00 },
+  ],
+  siding: [
+    { name:'LP SmartSide Lap (3/8")',     unit:'SQ', price:185.00 },
+    { name:'LP SmartSide Panel',          unit:'SQ', price:192.00 },
+    { name:'Hardie Plank Lap',            unit:'SQ', price:210.00 },
+    { name:'Vinyl Siding',                unit:'SQ', price:145.00 },
+    { name:'Aluminum Wrap (Coil)',        unit:'LF',  price:  4.20 },
+  ],
+  windows: [
+    { name:'Double-Hung Window (Std)',    unit:'EA', price:385.00 },
+    { name:'Picture Window',              unit:'EA', price:345.00 },
+    { name:'Casement Window',             unit:'EA', price:425.00 },
+    { name:'Window Installation Labor',   unit:'EA', price: 95.00 },
+  ],
+  doors: [
+    { name:'Entry Door (Steel)',          unit:'EA', price:650.00 },
+    { name:'Storm Door',                  unit:'EA', price:295.00 },
+    { name:'Sliding Glass Door',          unit:'EA', price:895.00 },
+    { name:'Door Install Labor',          unit:'EA', price:185.00 },
+  ],
+};
+
+function updateQATrade() {
+  const trade = document.getElementById('qa-trade');
+  const prodSel = document.getElementById('qa-product');
+  const unitInp = document.getElementById('qa-unit');
+  const priceInp = document.getElementById('qa-price');
+  if (!trade || !prodSel) return;
+
+  const key = trade.value;
+  const products = QA_PRODUCTS[key] || [];
+
+  prodSel.innerHTML = products.length
+    ? products.map(p => `<option value="${p.name}" data-unit="${p.unit}" data-price="${p.price}">${p.name}</option>`).join('')
+    : '<option value="">— no products —</option>';
+
+  // Auto-set unit + price from first product
+  if (products.length) {
+    if (unitInp)  unitInp.value  = products[0].unit;
+    if (priceInp) priceInp.value = products[0].price.toFixed(2);
+  }
+}
+
+function updateQAProduct() {
+  const prodSel  = document.getElementById('qa-product');
+  const unitInp  = document.getElementById('qa-unit');
+  const priceInp = document.getElementById('qa-price');
+  if (!prodSel || !prodSel.selectedOptions[0]) return;
+
+  const opt   = prodSel.selectedOptions[0];
+  const unit  = opt.getAttribute('data-unit')  || 'EA';
+  const price = opt.getAttribute('data-price') || '0';
+  if (unitInp)  unitInp.value  = unit;
+  if (priceInp) priceInp.value = parseFloat(price).toFixed(2);
+}
+
 function addQALine() {
   const trade = document.getElementById('qa-trade');
   const product = document.getElementById('qa-product');
@@ -5933,6 +6077,7 @@ function copyEstimateText(asMO) {
   }
   navigator.clipboard.writeText(text).then(() => showToast('\u2705 Copied to clipboard!', 'success'));
 }
+
 
 
 
