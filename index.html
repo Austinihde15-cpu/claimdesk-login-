@@ -1258,7 +1258,7 @@ input[type=file] { display: none; }
     <div class="nav-item" onclick="goto('docbuilder')" id="nav-docbuilder">
       <span>&#x1F4DD;</span><span>Doc Builder</span>
     </div>
-    <div class="nav-section">System</div>
+    <div class="nav-section" id="nav-section-system">System</div>
     <div class="nav-item" onclick="goto('settings')" id="nav-settings">
       <span>&#x2699;&#xFE0F;</span><span>Settings</span>
     </div>
@@ -1703,13 +1703,20 @@ function updateSidebarUser(){
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.full_name||""}</div>
         <div style="font-size:10px;color:rgba(255,255,255,0.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
+        ${u.role==='moderator'?'<div style="font-size:9px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,.15);border-radius:4px;padding:1px 6px;margin-top:2px;display:inline-block;letter-spacing:.05em;">🛡️ MODERATOR</div>':''}
       </div>
       ${getPlanBadge(c.plan)}
     </div>
     ${c.plan_status==='trialing'?`<div style="margin-top:7px;font-size:10px;color:#fbbf24;background:rgba(251,191,36,.15);padding:3px 8px;border-radius:5px;">&#x23F3; Trial: ${c.trial_days_left||14}d left</div>`:''}
   </div>`;
+  // ── Role-based nav visibility ──
+  const role = state.user?.role;
+  const isModeratorOnly = role === 'moderator';
+  const navSettings = document.getElementById('nav-settings');
+  const navSectionSystem = document.getElementById('nav-section-system');
+  if (navSettings)      navSettings.style.display      = isModeratorOnly ? 'none' : '';
+  if (navSectionSystem) navSectionSystem.style.display  = isModeratorOnly ? 'none' : '';
 }
-
 function showUserMenu(){
   const u=state.user,c=state.company;
   const isFounder=u?.email==='austin@coxroof.com'||u?.email==='cait@coxroof.com'||u?.email==='austin.ihde15@gmail.com';
@@ -1968,7 +1975,16 @@ function goto(page, param) {
   if (page === 'dashboard') loadDashboard();
   else if (page === 'claims') renderClaimsPage().catch(e => showToast('Failed to load claims: ' + e.message, 'danger'));
   else if (page === 'tasks') loadTasksPage();
-  else if (page === 'settings') { renderSettingsPage(); setTimeout(loadSettingsTabData, 100); }
+  else if (page === 'settings') {
+    const userRole = state.user?.role;
+    if (userRole === 'moderator') {
+      showToast('⛔ Settings access is restricted to admins only.', 'danger');
+      goto('dashboard');
+      return;
+    }
+    renderSettingsPage();
+    setTimeout(loadSettingsTabData, 100);
+  }
   else if (page === 'docbuilder') renderDocBuilderPage();
   else if (page === 'photochecklist') renderPhotoChecklistPage();
   else if (page === 'calendar') renderCalendarPage();
