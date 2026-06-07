@@ -1864,7 +1864,7 @@ async function init(){
   try {
     // ---- Detect invite token in URL ----
     const urlParams = new URLSearchParams(window.location.search);
-    let inviteToken = urlParams.get('token');
+    let inviteToken = urlParams.get('token') || urlParams.get('invite');
     const companyParam = urlParams.get('company') || 'Cox Roofing';
     if (!inviteToken) {
       const hashMatch = window.location.hash.match(/^#invite\/(.+)$/);
