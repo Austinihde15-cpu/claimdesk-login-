@@ -2308,8 +2308,9 @@ async function loadDashboard() {
                   ${c.stall_score||0}
                 </span>
               </td>
-              <td onclick="event.stopPropagation()">
+              <td onclick="event.stopPropagation()" style="white-space:nowrap">
                 <button class="btn btn-primary btn-sm" onclick="goto('claim','${c.id}')">Open</button>
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-weight:700;margin-left:4px;padding:4px 8px" onclick="openPhotoSession('${c.id}')">&#x1F4F8;</button>
               </td>
             </tr>`).join('')}
           </tbody>
@@ -2510,6 +2511,7 @@ function renderClaimDetail(data) {
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${statusBadge(c.status)} ${priorityBadge(c.priority)}
         <button class="btn btn-primary btn-sm" style="background:linear-gradient(135deg,#1345A8,#1e6fff);font-weight:800" onclick="openDocBuilderForJob('${c.id}')">&#x1F4DD; Build Doc</button>
+        <button class="btn btn-primary btn-sm" style="background:linear-gradient(135deg,#0d6e3f,#16a34a);font-weight:800" onclick="openPhotoSession('${c.id}')">&#x1F4F8; Photo Session</button>
       </div>
     </div>
 
@@ -2546,6 +2548,7 @@ function renderClaimDetail(data) {
         <button class="btn btn-primary" onclick="openUploadModal('${c.id}')">&#x1F4CE; Upload Document -> Parse</button>
         <button class="btn btn-primary" onclick="runDocAnalysis('${c.id}')">&#x1F50D; Analyze Existing Docs</button>
         <button class="btn btn-orange" onclick="buildEvidencePacket('${c.id}')">&#x1F4E6; Build Evidence Packet</button>
+        <button class="btn btn-primary" style="background:linear-gradient(135deg,#0d6e3f,#16a34a);font-weight:800" onclick="openPhotoSession('${c.id}')">&#x1F4F8; Start Photo Session</button>
       </div>
     </div>
 
@@ -9151,7 +9154,124 @@ let pcState = {
   photos: {},       // { item_id: { file, dataUrl, note, ts } }
   submitted: false,
   role: 'all',      // 'all' | 'salesman' | 'crew_lead'
+  // ── Claim-context fields (set by openPhotoSession) ──
+  claimId:    null,
+  claimType:  'hail',
+  lossDate:   '',
+  scopeNote:  '',
+  assignedRep:'',
 };
+
+// Per-claim photo session persistence
+window._pcSessions = window._pcSessions || {};
+
+function savePCSession() {
+  if (!pcState.claimId) return;
+  window._pcSessions[pcState.claimId] = {
+    jobType: pcState.jobType, photos: pcState.photos,
+    jobNum: pcState.jobNum, homeowner: pcState.homeowner,
+    address: pcState.address, crew: pcState.crew || '',
+    claimType: pcState.claimType, lossDate: pcState.lossDate,
+    scopeNote: pcState.scopeNote,
+  };
+}
+
+function detectJobTypeFromClaim(c) {
+  const txt = ((c.notes||'') + (c.open_items||'') + (c.damage_type||'')).toLowerCase();
+  const has = t => txt.includes(t);
+  if ((has('siding') && has('window')) || (has('siding') && has('gutter')) || (has('full exterior'))) return 'full_exterior';
+  if (has('struct') || has('framing') || has('rafter')) return 'structural_framing';
+  if (has('siding'))   return 'siding_only';
+  if (has('window'))   return 'windows_only';
+  if (has('gutter') && has('fascia')) return 'gutters_only';
+  if (has('gutter'))   return 'gutters_trade';
+  if (has('fascia'))   return 'fascia_only';
+  if (has('soffit'))   return 'soffit_only';
+  if (/commercial|flat|tpo|epdm/.test(txt)) return 'commercial';
+  return 'full_roof';
+}
+
+function buildScopeNote(c) {
+  return [
+    c.damage_type ? c.damage_type.replace(/_/g,' ').toUpperCase() : '',
+    c.date_of_loss ? 'DOL: ' + c.date_of_loss : '',
+    c.carrier || '',
+    c.claim_number ? 'Claim #' + c.claim_number : '',
+    c.carrier_rcv ? 'Carrier: $' + Number(c.carrier_rcv).toLocaleString() : '',
+    c.cox_rcv ? 'Cox: $' + Number(c.cox_rcv).toLocaleString() : '',
+  ].filter(Boolean).join(' · ') || 'No scope notes on file';
+}
+
+function openPhotoSession(claimId, claimObj) {
+  const c = claimObj || (state.claims||[]).find(x=>x.id===claimId) || {};
+  const saved = (window._pcSessions||{})[claimId] || {};
+  pcState.claimId     = claimId;
+  pcState.jobNum      = c.job_number   || saved.jobNum     || '';
+  pcState.homeowner   = c.insured_name || saved.homeowner  || '';
+  pcState.address     = [c.address,c.city,c.state].filter(Boolean).join(', ') || saved.address || '';
+  pcState.claimType   = (c.damage_type||'hail').toLowerCase();
+  pcState.lossDate    = c.date_of_loss || '';
+  pcState.scopeNote   = buildScopeNote(c);
+  pcState.assignedRep = c.assigned_rep || '';
+  pcState.submitted   = false;
+  pcState.role        = 'all';
+  pcState.photos      = saved.photos   || {};
+  pcState.jobType     = saved.jobType  || detectJobTypeFromClaim(c);
+  goto('photochecklist');
+}
+
+async function analyzePhotosWithRandy() {
+  const totalPhotos = Object.keys(pcState.photos).length;
+  if (totalPhotos === 0) { showToast('No photos yet — upload at least one photo first.','warning'); return; }
+  const btn = document.getElementById('pc-analyze-btn');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ Analyzing...'; }
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  const covered=[], missing=[];
+  if (checklist) {
+    checklist.sections.forEach(s => s.items.forEach(i => {
+      if (pcState.photos[i.id]) covered.push(i.label);
+      else if (i.required) missing.push(i.label);
+    }));
+  }
+  const prompt = `You are Randy, Cox Roofing & Restoration AI field assistant.\n\nJOB: #${pcState.jobNum} — ${pcState.homeowner}\nADDRESS: ${pcState.address}\nDAMAGE: ${(pcState.claimType||'hail').toUpperCase()} | DOL: ${pcState.lossDate||'unknown'}\nJOB TYPE: ${(PHOTO_CHECKLISTS[pcState.jobType]||{}).label||pcState.jobType}\nSCOPE: ${pcState.scopeNote||'none'}\n\nPHOTO STATUS:\n- Photos uploaded: ${totalPhotos}\n- Required items COVERED (${covered.length}): ${covered.slice(0,10).join(', ')}\n- Required items MISSING (${missing.length}): ${missing.join(', ')||'none'}\n\nProvide:\n1. COVERAGE SUMMARY — which supplement-critical shots are confirmed\n2. MISSING CRITICAL SHOTS — what is missing and exactly how to get each shot\n3. SUPPLEMENT STRENGTH rating: Weak / Fair / Strong / Excellent\n4. NEXT 3 SHOTS — highest priority shots with specific field instructions\n5. UNIFORMITY NOTE — if full exterior/siding/windows, evaluate whether current shots support the cannot-match uniformity argument\n\nContractor-only language. No policy references. Practical field guidance only.`;
+  try {
+    const r = await callFunction('randyGateway',{prompt,context:'photo_analysis'});
+    if (btn) { btn.disabled=false; btn.innerHTML='&#x1F916; Analyze with Randy'; }
+    if (r && r.response) {
+      // Show result overlay
+      let ov = document.getElementById('pc-analysis-ov');
+      if (ov) ov.remove();
+      ov = document.createElement('div');
+      ov.id = 'pc-analysis-ov';
+      ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';
+      ov.innerHTML=`<div style="background:#0f172a;color:#e2e8f0;border-radius:16px;padding:28px 32px;max-width:720px;width:100%;margin:auto;box-shadow:0 24px 64px rgba(0,0,0,.6);border:1px solid #334155;position:relative"><button onclick="document.getElementById('pc-analysis-ov').remove()" style="position:absolute;top:16px;right:16px;background:#334155;border:none;color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:700">✕ Close</button><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><span style="font-size:28px">🤖</span><div><div style="font-size:17px;font-weight:800">Randy — Photo Analysis</div><div style="font-size:12px;color:#64748b">#${pcState.jobNum} · ${pcState.homeowner} · ${covered.length} covered, ${missing.length} missing</div></div></div><div style="background:#1e293b;border-radius:10px;padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;border:1px solid #334155;max-height:60vh;overflow-y:auto">${r.response.replace(/</g,'&lt;')}</div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button onclick="document.getElementById('pc-analysis-ov').remove()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px">✓ Back to Checklist</button><button onclick="exportPhotoLog()" style="background:#334155;color:#e2e8f0;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px">📋 Export Log</button></div></div>`;
+      document.body.appendChild(ov);
+    } else { showToast('Analysis returned empty. Try again.','error'); }
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.innerHTML='&#x1F916; Analyze with Randy'; }
+    showToast('Analysis failed: '+e.message,'error');
+  }
+}
+
+function exportPhotoLog() {
+  const cl = PHOTO_CHECKLISTS[pcState.jobType];
+  if (!cl) return;
+  let log=`PHOTO LOG — Cox Roofing & Restoration\nJob #${pcState.jobNum} · ${pcState.homeowner}\n${pcState.address}\nType: ${cl.label} · Damage: ${(pcState.claimType||'hail').toUpperCase()}\nGenerated: ${new Date().toLocaleString()}\n${'─'.repeat(48)}\n\n`;
+  let done=0,req=0;
+  cl.sections.forEach(s=>{
+    const sd=s.items.filter(i=>!!pcState.photos[i.id]).length;
+    log+=`${s.title.replace(/[^\w\s·—]/g,'').trim().toUpperCase()} (${sd}/${s.items.length})\n`;
+    s.items.forEach(i=>{
+      const d=!!pcState.photos[i.id];
+      const nt=pcState.photos[i.id]?.note?` — "${pcState.photos[i.id].note}"` : '';
+      log+=`  ${d?'✅':i.required?'❌':'⬜'} ${i.label}${nt}\n`;
+      if(i.required)req++;if(d)done++;
+    });
+    log+='\n';
+  });
+  log+=`${'─'.repeat(48)}\nSUMMARY: ${done} photos captured · ${req} required items\nMeasurements: "Measurements derived from satellite imagery and on-site photo analysis — field verification recommended."\n`;
+  navigator.clipboard.writeText(log).then(()=>showToast('📋 Photo log copied — paste into Notes','success')).catch(()=>showToast('Copy failed — try long-pressing the export text','error'));
+}
 
 // -------------------------------------------------------------
 //  RENDER MAIN PAGE
@@ -9394,6 +9514,24 @@ function renderPhotoChecklistPage() {
 
   <!-- ══ JOB TYPE SELECTOR ══ -->
   <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Job Type</div>
+  <!-- ══ CLAIM CONTEXT BANNER ══ -->
+  <div id="pc-claim-banner" style="display:${pcState.claimId ? 'flex' : 'none'};background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;border-radius:12px;padding:16px 24px;margin-bottom:20px;align-items:center;gap:16px;flex-wrap:wrap;border:1px solid #334155;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+    <div style="font-size:28px">&#x1F4CB;</div>
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Loaded from Claim</div>
+      <div style="font-size:15px;font-weight:800;letter-spacing:-0.02em">#${pcState.jobNum||'--'} — ${pcState.homeowner||'--'}</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:2px">${pcState.address||'--'}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px">${pcState.scopeNote||''}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span style="background:#1e3a5f;color:#60a5fa;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:800;text-transform:uppercase">${(pcState.claimType||'hail').toUpperCase()}</span>
+      <span style="background:#1e293b;color:#94a3b8;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">${pcState.lossDate||''}</span>
+      <button id="pc-analyze-btn" onclick="analyzePhotosWithRandy()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F916; Analyze</button>
+      <button onclick="exportPhotoLog()" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">&#x1F4CB; Export</button>
+      <button onclick="savePCSession();goto('claim',pcState.claimId)" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">&#x2190; Back</button>
+    </div>
+  </div>
+
   <div class="type-selector" id="pc-type-selector">
     ${Object.entries(PHOTO_CHECKLISTS).map(([key,val]) => `
       <div class="type-btn ${pcState.jobType===key?'active':''}" onclick="setPCJobType('${key}')">
