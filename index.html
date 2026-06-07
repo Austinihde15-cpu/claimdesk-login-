@@ -8545,6 +8545,264 @@ async function submitInvitePanel(){
 
 
 <script>
+// ══════ PHOTO CHECKLISTS DATA CATALOG ══════
+// Calibrated from: Rogers-4808 (hail), Keys-Hodges-4812 (full exterior),
+// Bethlehem Lutheran / Crais-6355 (wind/slate), Cox Roofing field standard
+// Each section.role: 'salesman' | 'crew_lead'
+// Each item: id, label, description, required (bool), claimType ('hail'|'wind'|'all')
+
+const PHOTO_CHECKLISTS = {
+
+  // ──────────────────────────────────────────────────────────────
+  full_roof: {
+    label: 'Full Roof Replacement',
+    icon: '🏠',
+    sections: [
+      {
+        id: 'overview',
+        title: '📐 Roof Overview',
+        role: 'salesman',
+        items: [
+          { id: 'fr_overview_front',    label: 'Front elevation — full roofline visible',       description: 'Full-height shot showing all front slopes, ridge, and fascia. Required for adjuster to confirm scope.', required: true,  claimType: 'all' },
+          { id: 'fr_overview_rear',     label: 'Rear elevation — full roofline visible',         description: 'Mirror of front — rear slopes, ridge, valley if present. Carriers require all 4 elevations.', required: true,  claimType: 'all' },
+          { id: 'fr_overview_left',     label: 'Left elevation — full roofline',                 description: 'Left side including rake edges and any dormers.', required: true,  claimType: 'all' },
+          { id: 'fr_overview_right',    label: 'Right elevation — full roofline',                description: 'Right side. Together with front/rear/left this confirms full perimeter and square count.', required: true,  claimType: 'all' },
+          { id: 'fr_overview_ridge',    label: 'Ridge line — full length',                       description: 'Walking or drone shot showing full ridge. Important for ridge vent and hip/ridge cap line items.', required: true,  claimType: 'all' },
+          { id: 'fr_overview_aerial',   label: 'Aerial / drone overview (if available)',          description: 'Best single shot to establish total square footage and roof geometry. Use if HOVER is not available.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'damage',
+        title: '🔴 Hail & Wind Damage — Close-Ups',
+        role: 'salesman',
+        items: [
+          { id: 'fr_dmg_shingle1',      label: 'Hail hits — front slope close-up (multiple)',    description: 'Multiple shots showing individual hail spatter marks with bruising, granule loss. Minimum 3 per affected slope.', required: true,  claimType: 'hail' },
+          { id: 'fr_dmg_shingle2',      label: 'Hail hits — rear slope close-up',                description: 'Same as front — confirms damage is not isolated to one elevation.', required: true,  claimType: 'hail' },
+          { id: 'fr_dmg_shingle3',      label: 'Hail hits — left slope close-up',               description: '2-3 elevations damaged = full replacement argument. Each elevation documented.', required: true,  claimType: 'hail' },
+          { id: 'fr_dmg_chalk',         label: 'Chalk-circled hail hits on shingle',              description: 'Optional but high-value: chalk 10 hits on one shingle to show density to adjuster.', required: false, claimType: 'hail' },
+          { id: 'fr_dmg_wind_lifted',   label: 'Wind-lifted or missing shingles',                description: 'Show unsealed tabs, lifted corners, or missing shingles. Tie to wind speed if known.', required: true,  claimType: 'wind' },
+          { id: 'fr_dmg_wind_crease',   label: 'Wind crease or fold lines on shingles',          description: 'Pressure crease from wind uplift — important for wind-only claims.', required: true,  claimType: 'wind' },
+          { id: 'fr_dmg_scale',         label: 'Hail hit with scale reference (coin/tape)',       description: 'Penny, quarter, or tape measure next to largest hail hit. Establishes hail size for carrier.', required: true,  claimType: 'hail' },
+          { id: 'fr_dmg_dents_metal',   label: 'Hail dents on metal cap/flashing/vent',          description: 'Metal surfaces show undeniable hail damage. Ridge caps, drip edge, vents, pipe boots — all photograph well.', required: true,  claimType: 'hail' },
+        ]
+      },
+      {
+        id: 'flashings',
+        title: '🔩 Flashings, Vents & Penetrations',
+        role: 'salesman',
+        items: [
+          { id: 'fr_flash_drip',        label: 'Drip edge — front and rear runs',               description: 'Show existing drip edge condition. Required for R&R line item.', required: true,  claimType: 'all' },
+          { id: 'fr_flash_pipe',        label: 'Pipe boot / roof jack',                          description: 'Close-up of each pipe penetration. Hail often cracks lead boots.', required: true,  claimType: 'all' },
+          { id: 'fr_flash_chimney',     label: 'Chimney / fireplace chase flashing',             description: 'Chimney flashing condition — step flashing, counter flashing, cap. High line item value.', required: false, claimType: 'all' },
+          { id: 'fr_flash_sidewall',    label: 'Sidewall / endwall step flashing',               description: 'Any wall-to-roof transition. Required if sidewall flashing is in scope.', required: false, claimType: 'all' },
+          { id: 'fr_vent_ridge',        label: 'Ridge vent (if present)',                        description: 'Full ridge vent run. Required for continuous ridge vent line item.', required: false, claimType: 'all' },
+          { id: 'fr_vent_turtle',       label: 'Turtle / box vents',                            description: 'Each vent — show hail dents on louvers. Strong line item evidence.', required: false, claimType: 'all' },
+          { id: 'fr_vent_exhaust',      label: 'Exhaust / dryer caps through roof',              description: 'Each cap — show condition and hail hits if present.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'measurements',
+        title: '📏 Measurements & Documentation',
+        role: 'salesman',
+        items: [
+          { id: 'fr_meas_tape_eave',    label: 'Tape measure on eave run',                       description: 'Eave length with tape in frame. Backs up satellite measurements. Required for drip edge/gutter LF.', required: true,  claimType: 'all' },
+          { id: 'fr_meas_tape_rake',    label: 'Tape measure on rake edge',                      description: 'Rake length for drip edge and siding LF.', required: false, claimType: 'all' },
+          { id: 'fr_meas_pitch',        label: 'Pitch gauge / inclinometer on slope',            description: 'Pitch reading in frame. Required to justify steep surcharge line items (7/12+).', required: true,  claimType: 'all' },
+          { id: 'fr_meas_stories',      label: 'Story height — 2-story confirmation',            description: 'Wide shot clearly showing 2 stories. Required for high-roof surcharge line items.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'decking',
+        title: '🪵 Decking & Substrate',
+        role: 'crew_lead',
+        items: [
+          { id: 'fr_deck_exposed',      label: 'Exposed decking after tear-off',                 description: 'Required for re-nail line item — show existing nail pattern before re-nail.', required: true,  claimType: 'all' },
+          { id: 'fr_deck_damage',       label: 'Soft / rotted / damaged decking',                description: 'Any decking that needs replacement — show extent before patching. Add R&R sheathing line item.', required: false, claimType: 'all' },
+          { id: 'fr_deck_renail',       label: 'Re-nailed decking (after)',                      description: 'After shot showing new nail pattern. Completes the before/after pair for re-nail line item.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'completion',
+        title: '✅ Completion / Final',
+        role: 'crew_lead',
+        items: [
+          { id: 'fr_final_ridge',       label: 'Completed ridge cap — full run',                 description: 'Final ridge cap installed. Confirms hip/ridge cap line item completed.', required: true,  claimType: 'all' },
+          { id: 'fr_final_overview',    label: 'Final roof — full elevation (4 sides)',          description: '4 after shots matching the 4 before overview shots. Required for final invoicing.', required: true,  claimType: 'all' },
+          { id: 'fr_final_cleanup',     label: 'Cleaned-up job site',                            description: 'Dumpster loaded, yard raked, magnets run. Protects from callback disputes.', required: true,  claimType: 'all' },
+          { id: 'fr_final_dumpster',    label: 'Full dumpster before haul',                      description: 'Shows debris volume — justifies dumpster line item if carrier questions it.', required: false, claimType: 'all' },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────────────────────
+  full_exterior: {
+    label: 'Full Exterior (Keys-Hodges Style)',
+    icon: '🏡',
+    sections: [
+      {
+        id: 'fe_roof_overview',
+        title: '📐 Roof Overview',
+        role: 'salesman',
+        items: [
+          { id: 'fe_roof_front',        label: 'Front roofline — full elevation',                description: 'All 4 elevations required for full exterior supplement.', required: true,  claimType: 'all' },
+          { id: 'fe_roof_rear',         label: 'Rear roofline — full elevation',                 description: 'Rear slope and ridge visible.', required: true,  claimType: 'all' },
+          { id: 'fe_roof_left',         label: 'Left roofline — full elevation',                 description: 'Left slope and rake edge.', required: true,  claimType: 'all' },
+          { id: 'fe_roof_right',        label: 'Right roofline — full elevation',                description: 'Right slope and rake edge.', required: true,  claimType: 'all' },
+        ]
+      },
+      {
+        id: 'fe_damage',
+        title: '🔴 Hail / Wind Damage Close-Ups',
+        role: 'salesman',
+        items: [
+          { id: 'fe_dmg_roof_closeup',  label: 'Hail hits on shingles (3+ elevations)',          description: 'Critical: 3 elevations documented = full replacement. Each elevation gets 2-3 close-ups.', required: true,  claimType: 'hail' },
+          { id: 'fe_dmg_scale_shot',    label: 'Scale reference shot (coin/tape)',                description: 'Hail size established with penny or tape. Ties to storm data.', required: true,  claimType: 'hail' },
+          { id: 'fe_dmg_metal_dents',   label: 'Hail dents on drip edge, vents, gutters',        description: 'Metal = undeniable. Photograph all metal surfaces with dents.', required: true,  claimType: 'hail' },
+        ]
+      },
+      {
+        id: 'fe_siding',
+        title: '🏘️ Siding — Uniformity Documentation',
+        role: 'salesman',
+        items: [
+          { id: 'fe_sid_dmg_elev',      label: 'Damaged siding elevation(s) — close-ups',        description: 'Hail hits, cracks, or impact marks on 2-3 elevations. These establish the damage.', required: true,  claimType: 'hail' },
+          { id: 'fe_sid_undamaged',     label: 'Undamaged elevations — showing age/weathering',  description: 'KEY SHOT: Show the matching undamaged siding to prove uniformity argument. 21-year-old siding will never match new — this photo wins the argument.', required: true,  claimType: 'all' },
+          { id: 'fe_sid_color_match',   label: 'Side-by-side color/texture comparison',          description: 'Two panels side by side — old vs. new sample or just old showing chalking/fading. Directly supports "cannot match" argument.', required: true,  claimType: 'all' },
+          { id: 'fe_sid_all4_elev',     label: 'All 4 siding elevations — full height',          description: 'Front/rear/left/right showing all siding top to bottom. Quantities reference for SF calculation.', required: true,  claimType: 'all' },
+          { id: 'fe_sid_jchannel',      label: 'J-channel, corners, trim detail',                description: 'Shows accessories that must also be replaced. Backs up J-trim, corner post, starter line items.', required: false, claimType: 'all' },
+          { id: 'fe_sid_accessories',   label: 'Outlet boxes, dryer vents, hose bibbs',          description: 'All penetrations through siding that need D&R or new J-blocks. Required for those line items.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'fe_windows',
+        title: '🪟 Windows — Uniformity Documentation',
+        role: 'salesman',
+        items: [
+          { id: 'fe_win_dmg_close',     label: 'Hail hits on window frames/screens (damaged elev)', description: 'Impact marks on frames, cracked screens, dented sills. 2-3 elevations.', required: true,  claimType: 'hail' },
+          { id: 'fe_win_all_front',     label: 'All front elevation windows — wide shot',         description: 'Shows all windows matching — proves they are original matching units.', required: true,  claimType: 'all' },
+          { id: 'fe_win_weathering',    label: 'Window weathering / oxidation / tint comparison', description: 'Close-up showing how existing windows have yellowed, hazed, or lost tint clarity. Uniformity argument: new windows will never match.', required: true,  claimType: 'all' },
+          { id: 'fe_win_grid_detail',   label: 'Grid pattern / frame profile detail',             description: 'Show the specific grid pattern and frame profile that would be impossible to match.', required: false, claimType: 'all' },
+          { id: 'fe_win_screen_dmg',    label: 'Damaged window screens',                          description: 'Hail-damaged screens — R&R window screen line item requires documentation.', required: false, claimType: 'hail' },
+        ]
+      },
+      {
+        id: 'fe_gutters',
+        title: '🌧️ Gutters, Soffit & Fascia',
+        role: 'salesman',
+        items: [
+          { id: 'fe_gut_dents',         label: 'Gutter dents — hail impacts (close-up)',          description: 'Gutter face dents from hail. Best evidence for full gutter replacement.', required: true,  claimType: 'hail' },
+          { id: 'fe_gut_full_run',      label: 'Full gutter runs — all elevations',               description: 'Wide shots of all gutter runs for LF measurement confirmation.', required: true,  claimType: 'all' },
+          { id: 'fe_gut_downspouts',    label: 'All downspouts — condition + dents',              description: 'Each downspout close-up. Dents justify R&R vs. D&R.', required: true,  claimType: 'all' },
+          { id: 'fe_fascia_condition',  label: 'Fascia — existing condition + hail hits',         description: 'Fascia board condition. Must be replaced to match new siding — uniformity argument.', required: true,  claimType: 'all' },
+          { id: 'fe_soffit_condition',  label: 'Soffit — existing condition',                     description: 'Soffit panels — show existing material and condition. Ties to metal soffit R&R line item.', required: true,  claimType: 'all' },
+        ]
+      },
+      {
+        id: 'fe_interior',
+        title: '🏠 Interior (Water Intrusion)',
+        role: 'salesman',
+        items: [
+          { id: 'fe_int_stains',        label: 'Ceiling/wall water stains',                       description: 'Any interior water damage. Establishes urgency and additional scope.', required: false, claimType: 'all' },
+          { id: 'fe_int_attic',         label: 'Attic — wet insulation or daylight',              description: 'Attic inspection photos if water intrusion suspected.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'fe_crew_completion',
+        title: '✅ Crew Completion',
+        role: 'crew_lead',
+        items: [
+          { id: 'fe_crew_final_roof',   label: 'Completed roof — all 4 elevations',              description: 'Final after photos for all 4 roof elevations.', required: true,  claimType: 'all' },
+          { id: 'fe_crew_siding_done',  label: 'Completed siding — all 4 elevations',            description: 'Final siding install photos. Before + after required.', required: true,  claimType: 'all' },
+          { id: 'fe_crew_gutters_done', label: 'Completed gutters + downspouts',                  description: 'Installed gutters and all downspouts.', required: true,  claimType: 'all' },
+          { id: 'fe_crew_windows_done', label: 'Completed windows — all installed',               description: 'At least one photo per elevation showing new windows installed.', required: true,  claimType: 'all' },
+          { id: 'fe_crew_cleanup',      label: 'Final site cleanup',                               description: 'Yard clean, all debris removed, magnets run.', required: true,  claimType: 'all' },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────────────────────
+  gutters_only: {
+    label: 'Gutters / Soffit / Fascia Only',
+    icon: '🌊',
+    sections: [
+      {
+        id: 'go_damage',
+        title: '🔴 Damage Documentation',
+        role: 'salesman',
+        items: [
+          { id: 'go_dmg_dents_closeup', label: 'Gutter dents — close-up (multiple)',             description: 'Multiple shots of hail impact dents on gutter face. Each shot = stronger claim.', required: true,  claimType: 'hail' },
+          { id: 'go_dmg_ds_dents',      label: 'Downspout dents — close-up',                     description: 'Each downspout with impact dents shown clearly.', required: true,  claimType: 'hail' },
+          { id: 'go_dmg_fascia',        label: 'Fascia hail hits / condition',                    description: 'Fascia board damage or deterioration requiring replacement.', required: true,  claimType: 'all' },
+          { id: 'go_dmg_soffit',        label: 'Soffit condition / damage',                       description: 'Soffit panels — hail damage or condition requiring replacement.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'go_measurements',
+        title: '📏 Measurements',
+        role: 'salesman',
+        items: [
+          { id: 'go_meas_runs',         label: 'Full gutter runs — all 4 elevations',            description: 'Wide shot of each run for LF measurement. Back up satellite measurements.', required: true,  claimType: 'all' },
+          { id: 'go_meas_tape',         label: 'Tape measure on longest run',                     description: 'Confirms LF count for carrier.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'go_completion',
+        title: '✅ Completion',
+        role: 'crew_lead',
+        items: [
+          { id: 'go_final_gutters',     label: 'Installed gutters — all runs',                    description: 'Final installed photos for all gutter runs.', required: true,  claimType: 'all' },
+          { id: 'go_final_downspouts',  label: 'Installed downspouts',                            description: 'All downspouts with proper discharge confirmed.', required: true,  claimType: 'all' },
+          { id: 'go_final_cleanup',     label: 'Site cleanup complete',                           description: 'Ladder marks addressed, debris cleared.', required: true,  claimType: 'all' },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────────────────────
+  commercial: {
+    label: 'Commercial / Flat Roof',
+    icon: '🏢',
+    sections: [
+      {
+        id: 'cm_overview',
+        title: '📐 Roof Overview',
+        role: 'salesman',
+        items: [
+          { id: 'cm_overview_full',     label: 'Full rooftop aerial / overview',                 description: 'Drone or ladder shot showing full flat roof area. Required for SQ count.', required: true,  claimType: 'all' },
+          { id: 'cm_overview_parapet',  label: 'Parapet walls — all sides',                      description: 'All parapet wall conditions — caps, coping, cracks.', required: true,  claimType: 'all' },
+          { id: 'cm_overview_drains',   label: 'Roof drains / scuppers',                         description: 'Each drain and scupper — condition and any blockage.', required: true,  claimType: 'all' },
+        ]
+      },
+      {
+        id: 'cm_membrane',
+        title: '🔴 Membrane Damage',
+        role: 'salesman',
+        items: [
+          { id: 'cm_mem_blisters',      label: 'Membrane blistering / bubbling',                 description: 'TPO/EPDM/mod-bit blistering from hail or age. Close-up + wide.', required: true,  claimType: 'hail' },
+          { id: 'cm_mem_splits',        label: 'Membrane splits / tears',                        description: 'Any splits at seams or field — shows failure and water intrusion risk.', required: true,  claimType: 'all' },
+          { id: 'cm_mem_hail_spatter',  label: 'Hail spatter on membrane surface',               description: 'Impact marks on TPO/EPDM — multiple shots from multiple zones.', required: true,  claimType: 'hail' },
+          { id: 'cm_mem_ponding',       label: 'Ponding water areas',                            description: 'Document any standing water areas — supports inadequate drainage argument.', required: false, claimType: 'all' },
+        ]
+      },
+      {
+        id: 'cm_completion',
+        title: '✅ Completion',
+        role: 'crew_lead',
+        items: [
+          { id: 'cm_final_membrane',    label: 'New membrane installed — full field',             description: 'Final after photos showing completed membrane across full roof area.', required: true,  claimType: 'all' },
+          { id: 'cm_final_seams',       label: 'Seam welds / tape (close-up)',                   description: 'Close-up of seam welds confirming proper installation.', required: true,  claimType: 'all' },
+          { id: 'cm_final_cleanup',     label: 'Site cleanup complete',                           description: 'Rooftop cleared, equipment removed.', required: true,  claimType: 'all' },
+        ]
+      },
+    ]
+  },
+
+};
+// ══════ END PHOTO CHECKLISTS DATA ══════
+
+
 // ══════ PHOTO CHECKLIST MODULE ══════
 let pcState = {
   jobType: 'full_roof',
