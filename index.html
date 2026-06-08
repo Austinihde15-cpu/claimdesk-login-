@@ -1197,6 +1197,9 @@ input[type=file] { display: none; }
 .randy-chip:hover{background:#dbeafe;}
 </style>
 
+  <!-- jsPDF + autoTable for one-click PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div id="static-login-fallback" style="display:none!important;">
@@ -5376,7 +5379,8 @@ function buildEstimateTab() {
     <div class="card-header" style="display:flex;align-items:center;gap:10px">
       <div class="card-title">&#x1F4CB; Estimate / Supplement</div>
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="printEstimate()">&#x1F5A8; Print/PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="printEstimate()" title="Open print-ready window">&#x1F5A8; Print View</button>
+        <button class="btn btn-sm" onclick="exportEstimatePDF()" title="Download branded PDF" style="background:linear-gradient(135deg,#1345A8,#1e6fff);color:#fff;font-weight:800;border:none">&#x1F4E5; Download PDF</button>
         <button class="btn btn-ghost btn-sm" onclick="copyEstimateText()">&#x1F4CB; Copy Text</button>
         <button class="btn btn-ghost btn-sm" onclick="clearEstimate()">&#x1F5D1; Clear</button>
       </div>
@@ -6061,6 +6065,350 @@ function addLineToEstimate(lineData) {
 }
 
 // ─── PRINT: ESTIMATE/SUPPLEMENT VIEW (with Xactimate codes + notes) ──────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PDF EXPORT — jsPDF + autoTable, one-click download
+// Supplement lines (xCode flagged, or isSupplement=true) highlighted in orange
+// ─────────────────────────────────────────────────────────────────────────────
+async function exportEstimatePDF() {
+  if (!estLines || !estLines.length) {
+    showToast('Add line items before exporting.', 'warning');
+    return;
+  }
+  if (typeof window.jspdf === 'undefined') {
+    showToast('PDF library loading... try again in 2 seconds.', 'warning');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  const PW   = doc.internal.pageSize.getWidth();   // 612
+  const PH   = doc.internal.pageSize.getHeight();  // 792
+  const M    = 40;   // margin
+  const NAVY = [15, 28, 46];    // #0f1c2e
+  const RED  = [178, 34, 52];   // #B22234
+  const BLUE = [30, 111, 255];  // #1e6fff
+  const ORANGE = [234, 88, 12]; // supplement highlight
+  const GRAY = [100, 116, 139];
+
+  // ── Helper: read a form field value ─────────────────────────────────────
+  const fv = id => (document.getElementById(id)?.value || '').trim();
+  const numFv = id => parseFloat((document.getElementById(id)?.textContent||'0').replace(/[$,]/g,'')) || 0;
+
+  // ── Pull live estimate data ──────────────────────────────────────────────
+  const owner    = fv('est-owner');
+  const addr     = fv('est-addr');
+  const estNum   = fv('est-num')   || ('EST-' + new Date().toISOString().slice(0,10));
+  const estDate  = fv('est-date')  || new Date().toLocaleDateString();
+  const carrier  = fv('est-carrier');
+  const claimNum = fv('est-claim');
+  const dol      = fv('est-dol');
+  const adjName  = fv('est-adj');
+  const adjEmail = fv('est-adjemail');
+  const docType  = fv('est-doctype') || 'Insurance Supplement';
+
+  const inclOH = document.getElementById('op-include-overhead')?.checked ?? true;
+  const inclPR = document.getElementById('op-include-profit')?.checked   ?? true;
+  const ohPct  = (parseFloat(document.getElementById('op-overhead-pct')?.value) || 10) / 100;
+  const prPct  = (parseFloat(document.getElementById('op-profit-pct')?.value)   || 10) / 100;
+
+  const sub    = estLines.reduce((s,l) => s + (l.qty||0)*(l.price||0), 0);
+  const oh     = inclOH ? sub * ohPct : 0;
+  const profit = inclPR ? sub * prPct : 0;
+  const tax    = sub * 0.09679;
+  const grand  = sub + oh + profit + tax;
+  const fmt    = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const carrRCV = parseFloat(document.getElementById('est-carrier-rcv')?.value || '0') || 0;
+  const gap    = grand - carrRCV;
+
+  // ── DS (doc builder state) for fallback ─────────────────────────────────
+  const DS = window._dbState || {};
+  const h  = DS.job || {};
+
+  let y = M;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // HEADER BAND — navy background full width
+  // ══════════════════════════════════════════════════════════════════════
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, PW, 80, 'F');
+
+  // Company name
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('COX ROOFING & RESTORATION', M, 32);
+
+  // Red accent bar under company name
+  doc.setFillColor(...RED);
+  doc.rect(M, 36, 210, 3, 'F');
+
+  // Tagline
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(180, 200, 220);
+  doc.text('Storm Damage  ·  Insurance Restoration  ·  Residential & Commercial', M, 50);
+  doc.text('860 Hanley Industrial Ct  ·  Brentwood/Maplewood MO 63144', M, 62);
+  doc.text('Austin Ihde, PM  ·  (314) 695-3868  ·  Austin@coxroof.com', M, 74);
+
+  // Doc type — right side of header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text(docType.toUpperCase(), PW - M, 32, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(180, 200, 220);
+  doc.text(estNum, PW - M, 46, { align: 'right' });
+  doc.text('Date: ' + estDate, PW - M, 58, { align: 'right' });
+  doc.text('Price List: MOSL8X  ·  Tax: 9.679%  ·  St. Louis MO', PW - M, 70, { align: 'right' });
+
+  y = 100;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // JOB INFO GRID — 2 columns
+  // ══════════════════════════════════════════════════════════════════════
+  const infoFields = [
+    ['Insured / Homeowner', owner || '—'],
+    ['Property Address',    addr  || '—'],
+    ['Insurance Carrier',   carrier || '—'],
+    ['Claim Number',        claimNum || '—'],
+    ['Date of Loss',        dol      || '—'],
+    ['Adjuster',            adjName + (adjEmail ? '  ·  ' + adjEmail : '') || '—'],
+  ];
+
+  const colW = (PW - M*2 - 12) / 2;
+  infoFields.forEach(([label, val], i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x   = M + col * (colW + 12);
+    const yy  = y + row * 36;
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, yy, colW, 30, 3, 3, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(x, yy, colW, 30, 3, 3, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text(label.toUpperCase(), x + 8, yy + 11);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...NAVY);
+    doc.text(val, x + 8, yy + 23, { maxWidth: colW - 16 });
+  });
+
+  y += Math.ceil(infoFields.length / 2) * 36 + 18;
+
+  // Section divider
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(1.5);
+  doc.line(M, y, PW - M, y);
+  y += 10;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // LINE ITEMS TABLE — autoTable
+  // Supplement lines (isSupplement=true OR xCode present) → orange row
+  // ══════════════════════════════════════════════════════════════════════
+  const tableBody = estLines.map((l, i) => [
+    String(i + 1),
+    (l.desc || '—') + (l.xCode ? '\n' + l.xCode : '') + (l.notes ? '\n' + l.notes : ''),
+    l.trade || '',
+    String(l.qty || 0),
+    l.unit || 'EA',
+    fmt(l.price || 0),
+    fmt((l.qty||0) * (l.price||0)),
+  ]);
+
+  // Determine which rows are supplement lines (have xCode = sign of insurance scope item)
+  const suppRows = new Set(
+    estLines.reduce((acc, l, i) => { if (l.xCode || l.isSupplement) acc.push(i); return acc; }, [])
+  );
+
+  doc.autoTable({
+    startY: y,
+    head: [['#', 'Description / Xactimate Code', 'Trade', 'Qty', 'Unit', 'Unit Price', 'Line Total']],
+    body: tableBody,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.5,
+      cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
+      font: 'helvetica',
+      textColor: NAVY,
+      lineColor: [226, 232, 240],
+      lineWidth: 0.5,
+    },
+    headStyles: {
+      fillColor: NAVY,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8,
+      halign: 'left',
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 20,  fontStyle: 'bold', textColor: GRAY },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 70,  fontSize: 8, textColor: GRAY },
+      3: { halign: 'right', cellWidth: 30 },
+      4: { halign: 'center', cellWidth: 30 },
+      5: { halign: 'right', cellWidth: 55 },
+      6: { halign: 'right', cellWidth: 60, fontStyle: 'bold' },
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    didParseCell(data) {
+      if (data.section === 'body' && suppRows.has(data.row.index)) {
+        // Supplement line — light orange highlight
+        data.cell.styles.fillColor = [255, 237, 213];
+        data.cell.styles.textColor = [154, 52, 18];
+      }
+    },
+    margin: { left: M, right: M },
+    showHead: 'everyPage',
+  });
+
+  y = doc.lastAutoTable.finalY + 20;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // SUPPLEMENT LEGEND (only if any supp rows exist)
+  // ══════════════════════════════════════════════════════════════════════
+  if (suppRows.size > 0) {
+    doc.setFillColor(255, 237, 213);
+    doc.roundedRect(M, y, 180, 16, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...ORANGE);
+    doc.text('⬛ Highlighted = Insurance Supplement Item', M + 6, y + 10.5);
+    y += 24;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // TOTALS BLOCK — right-aligned
+  // ══════════════════════════════════════════════════════════════════════
+  const totW = 230;
+  const totX = PW - M - totW;
+
+  // Check if we need a new page
+  if (y + 160 > PH - 60) {
+    doc.addPage();
+    y = M;
+  }
+
+  const totRows = [
+    ['Subtotal', fmt(sub), false],
+    ...(inclOH ? [['Overhead (' + (ohPct*100).toFixed(0) + '%)', fmt(oh), false]] : []),
+    ...(inclPR ? [['Profit ('  + (prPct*100).toFixed(0) + '%)', fmt(profit), false]] : []),
+    ['Material Sales Tax (9.679%)', fmt(tax), false],
+  ];
+
+  let ty = y;
+  totRows.forEach(([label, val]) => {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(totX, ty, totW, 20, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(totX, ty, totW, 20, 'S');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...GRAY);
+    doc.text(label, totX + 10, ty + 13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text(val, totX + totW - 10, ty + 13, { align: 'right' });
+    ty += 20;
+  });
+
+  // Grand total RCV row
+  doc.setFillColor(...NAVY);
+  doc.rect(totX, ty, totW, 28, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(255, 255, 255);
+  doc.text('TOTAL RCV', totX + 10, ty + 18);
+  doc.setFontSize(13);
+  doc.text(fmt(grand), totX + totW - 10, ty + 18, { align: 'right' });
+  ty += 28;
+
+  // Supplement gap row (if carrier RCV entered)
+  if (carrRCV > 0) {
+    doc.setFillColor(254, 243, 199);
+    doc.rect(totX, ty + 4, totW, 24, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(146, 64, 14);
+    doc.text('Carrier Scope: ' + fmt(carrRCV), totX + 10, ty + 16);
+    doc.setFontSize(10);
+    doc.text('Supplement Gap: +' + fmt(gap), totX + 10, ty + 27);
+    ty += 32;
+  }
+
+  y = Math.max(ty, y) + 24;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // SIGNATURE BLOCK
+  // ══════════════════════════════════════════════════════════════════════
+  if (y + 80 > PH - 80) { doc.addPage(); y = M; }
+
+  const sigX = M;
+  doc.setDrawColor(200, 210, 220);
+  doc.setLineWidth(0.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY);
+
+  doc.line(sigX, y + 30, sigX + 180, y + 30);
+  doc.text('Homeowner Signature', sigX, y + 40);
+  doc.text('Date: _______________', sigX + 190, y + 40);
+
+  doc.line(PW - M - 200, y + 30, PW - M, y + 30);
+  doc.text('Cox Roofing & Restoration Representative', PW - M - 200, y + 40);
+
+  y += 58;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // FOOTER DISCLAIMER
+  // ══════════════════════════════════════════════════════════════════════
+  const footY = PH - 50;
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, footY - 6, PW, 56, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(0, footY - 6, PW, footY - 6);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY);
+  const disclaimer = [
+    'Measurements derived from satellite imagery and on-site photo analysis — field verification recommended.',
+    'Cox Roofing & Restoration is a licensed roofing contractor. All work performed to current IRC, IBC, and manufacturer installation requirements.',
+    'We do not act as engineers, lawyers, public adjusters, or policy holders. This document is a contractor estimate only.',
+    '© ' + new Date().getFullYear() + ' Cox Roofing & Restoration  ·  860 Hanley Industrial Ct, Brentwood/Maplewood MO 63144  ·  Austin@coxroof.com  ·  (314) 695-3868',
+  ];
+  disclaimer.forEach((line, i) => {
+    doc.text(line, PW / 2, footY + i * 10, { align: 'center' });
+  });
+
+  // ── Page numbers (multi-page) ────────────────────────────────────────
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text('Page ' + p + ' of ' + pageCount, PW - M, footY + 32, { align: 'right' });
+  }
+
+  // ── Save ─────────────────────────────────────────────────────────────
+  const safeOwner = (owner || 'Estimate').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+  const fileName  = 'Cox_' + safeOwner + '_' + new Date().toISOString().slice(0,10) + '.pdf';
+  doc.save(fileName);
+  showToast('✅ PDF downloaded: ' + fileName, 'success');
+  if (window.__EST_DEBUG) console.log('[Randy] PDF exported:', fileName, '— pages:', pageCount, '— lines:', estLines.length);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function printEstimate() {
   const fmt = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const inclOH = document.getElementById('op-include-overhead')?.checked ?? true;
