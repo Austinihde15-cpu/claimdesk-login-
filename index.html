@@ -4927,10 +4927,12 @@ const GAF_TEMPLATES = {
 };
 
 // ─── LOAD GAF TEMPLATE ───────────────────────────────────────────────────────
-function loadGAFTemplate(key) {
+// ── Template loader — stack mode (default) or replace mode ───────────────────
+// loadGAFTemplate(key)          → STACK: append to existing lines
+// loadGAFTemplate(key, true)    → REPLACE: clear first (confirms if lines exist)
+function loadGAFTemplate(key, replace) {
   if (!key) return;
-  // Alias map: short button keys → actual GAF_TEMPLATES keys
-  // Central alias registry — extend here as new templates are added
+
   const ALIAS = {
     'hdz':        'hdz_charcoal',
     'hdz_default':'hdz_charcoal',
@@ -4943,47 +4945,94 @@ function loadGAFTemplate(key) {
     'flat':       'flatroof_modbit',
     'modbit':     'flatroof_modbit',
     'tpo':        'flatroof_modbit',
-    'gutters':    '__GUTTERS_INLINE__', // built inline below
+    'gutters':    '__GUTTERS_INLINE__',
+    'siding':     '__SIDING_INLINE__',
+    'windows':    '__WINDOWS_INLINE__',
   };
-  const resolvedKey = ALIAS[key] || key;
-  if (window.__EST_DEBUG) console.log('[Randy] loadGAFTemplate:', key, '→', resolvedKey);
-  const tpl = GAF_TEMPLATES[resolvedKey];
-  if (!tpl) {
-    // If still not found, try to build a minimal gutters-only template on the fly
-    if (key === 'gutters' || resolvedKey === '__GUTTERS_INLINE__') {
-      const gutterLines = [
-        { trade:'Gutters & Drainage', product:'6" K-Style Aluminum Gutter — .032 gauge', desc:'6" K-Style Seamless Aluminum Gutter — Installed', qty:120, unit:'LF', price:8.49, xCode:'GUT200', notes:'Full perimeter per SMACNA drainage standards.' },
-        { trade:'Gutters & Drainage', product:'3x4 Aluminum Downspout', desc:'3×4 Rectangular Aluminum Downspouts — Installed', qty:4, unit:'EA', price:95.00, xCode:'GUT230', notes:'Min 1 per 40 LF per IRC R903.4.' },
-        { trade:'Gutters & Drainage', product:'Gutter Guard / Leaf Filter', desc:'Gutter Screen / Leaf Guard — Install', qty:120, unit:'LF', price:3.25, xCode:'GUT240', notes:'Owner request — maintains warranty.' },
-        { trade:'Gutters & Drainage', product:'Fascia Board — 2×6 Primed', desc:'Fascia Board Replacement — Rotted sections', qty:40, unit:'LF', price:4.75, xCode:'FRM200', notes:'Carrier scope missing — required for gutter reattachment.' },
-      ];
-      if (estLines.length > 0 && !confirm('Load "Gutters & Drainage"?
 
-This will replace your current ' + estLines.length + ' line item(s).')) return;
-      estLines = gutterLines;
-      renderEstLines();
-      recalcEst();
-      showToast('✅ Loaded: Gutters & Drainage — 4 items. Update LF to field measurements.', 'success');
-      return;
-    }
+  const resolvedKey = ALIAS[key] || key;
+  const isSupp = ['supplement','hdz_insurance','siding','windows'].includes(key);
+  if (window.__EST_DEBUG) console.log('[Randy] loadGAFTemplate:', key, '→', resolvedKey, '| replace:', !!replace, '| supp:', isSupp);
+
+  // ── Inline templates ───────────────────────────────────────────────
+  let inlineLines = null;
+
+  if (resolvedKey === '__GUTTERS_INLINE__') {
+    inlineLines = {
+      name: 'Gutters & Drainage',
+      items: [
+        { trade:'Gutters & Drainage', product:'6" K-Style Aluminum Gutter — .032 gauge',   desc:'6" K-Style Seamless Aluminum Gutter — Installed',      qty:120, unit:'LF', price:8.49,  xCode:'GUT200', notes:'Full perimeter per SMACNA drainage standards.' },
+        { trade:'Gutters & Drainage', product:'3×4 Aluminum Downspout',                   desc:'3×4 Rectangular Aluminum Downspouts — Installed',      qty:4,   unit:'EA', price:95.00, xCode:'GUT230', notes:'Min 1 per 40 LF per IRC R903.4.' },
+        { trade:'Gutters & Drainage', product:'Gutter Guard / Leaf Filter',               desc:'Gutter Screen / Leaf Guard — Install',                 qty:120, unit:'LF', price:3.25,  xCode:'GUT240', notes:'Owner request — maintains warranty.' },
+        { trade:'Gutters & Drainage', product:'Fascia Board — 2×6 Primed',               desc:'Fascia Board Replacement — Rotted sections',           qty:40,  unit:'LF', price:4.75,  xCode:'FRM200', notes:'Carrier scope missing — required for gutter reattachment.' },
+      ]
+    };
+  }
+
+  if (resolvedKey === '__SIDING_INLINE__') {
+    inlineLines = {
+      name: 'Vinyl Siding — Full Exterior',
+      items: [
+        { trade:'Siding',  product:'LP SmartSide Engineered Siding — .042 gauge',   desc:'Vinyl Siding — Remove & Replace, Full Exterior',       qty:30,  unit:'SQ', price:185.00, xCode:'SID100', notes:'IRC R703.3 — damaged siding requires full replacement for uniform appearance. Uniformity argument applies.' },
+        { trade:'Siding',  product:'J-Channel / Trim — White',                      desc:'J-Channel & Trim — Perimeter',                         qty:320, unit:'LF', price:2.10,  xCode:'SID110', notes:'Required for proper water intrusion barrier per IRC.' },
+        { trade:'Siding',  product:'House Wrap — Tyvek HomeWrap',                   desc:'House Wrap / WRB — Replacement',                       qty:30,  unit:'SQ', price:22.00, xCode:'SID120', notes:'IRC R703.2 requires WRB behind siding.' },
+        { trade:'Siding',  product:'Aluminum Soffit — Vented',                      desc:'Soffit — Aluminum Vented, Remove & Replace',           qty:180, unit:'LF', price:6.50,  xCode:'SID200', notes:'Damaged by impact — full run required for uniformity.' },
+        { trade:'Siding',  product:'Aluminum Fascia — .024 gauge White',            desc:'Fascia — Aluminum Wrap, Remove & Replace',             qty:180, unit:'LF', price:4.25,  xCode:'SID210', notes:'Hail dents on visible fascia — uniformity argument.' },
+      ]
+    };
+  }
+
+  const tpl = inlineLines || (GAF_TEMPLATES[resolvedKey] ? GAF_TEMPLATES[resolvedKey] : null);
+
+  if (!tpl) {
     showToast('Template "' + key + '" not found.', 'error');
     return;
   }
-  if (estLines.length > 0 && !confirm('Load "' + tpl.name + '"?\n\nThis will replace your current ' + estLines.length + ' line item(s).')) return;
-  // Map template items → internal estLines format
-  estLines = tpl.items.map(it => ({
-    trade: it.trade,
-    product: it.product,
-    desc: it.desc,
-    qty: it.qty,
-    unit: it.unit,
-    price: it.price,
-    xCode: it.xCode || '',
-    notes: it.notes || '',
+
+  const tplName  = tpl.name || resolvedKey;
+  const tplItems = tpl.items || [];
+  const newLines = tplItems.map(it => ({
+    trade:        it.trade   || '',
+    product:      it.product || '',
+    desc:         it.desc    || it.product || '',
+    qty:          it.qty     || 1,
+    unit:         it.unit    || 'EA',
+    price:        it.price   || 0,
+    xCode:        it.xCode   || '',
+    notes:        it.notes   || '',
+    isSupplement: !!it.isSupplement || isSupp,
+    _tplGroup:    tplName,         // for group separator rendering
+    _lineId:      Math.random().toString(36).slice(2,9),
   }));
+
+  // ── Replace mode ──────────────────────────────────────────────────
+  if (replace) {
+    if (estLines.length > 0 && !confirm('Replace all ' + estLines.length + ' line(s) with "' + tplName + '"?\n\nThis cannot be undone.')) return;
+    estLines = newLines;
+    renderEstLines();
+    recalcEst();
+    showToast('✅ Loaded: ' + tplName + ' — ' + newLines.length + ' items.', 'success');
+    return;
+  }
+
+  // ── Stack mode (default) ──────────────────────────────────────────
+  // Dedupe: skip lines where desc already exists in current estLines
+  const existingDescs = new Set(estLines.map(l => (l.desc||'').toLowerCase().trim()));
+  const fresh  = newLines.filter(l => !existingDescs.has((l.desc||'').toLowerCase().trim()));
+  const dupes  = newLines.length - fresh.length;
+
+  if (!fresh.length) {
+    showToast('⚠️ All lines from "' + tplName + '" already exist in estimate — nothing added.', 'warning');
+    return;
+  }
+
+  estLines = [...estLines, ...fresh];
   renderEstLines();
   recalcEst();
-  showToast('\u2705 Loaded: ' + tpl.name + ' \u2014 ' + tpl.items.length + ' items. Update quantities to your field measurements.', 'success');
+
+  const dupeNote = dupes > 0 ? ' (' + dupes + ' duplicate' + (dupes>1?'s':'')+' skipped)' : '';
+  showToast('➕ Stacked: ' + tplName + ' — +' + fresh.length + ' items' + dupeNote + '. Total: ' + estLines.length, 'success');
+  if (window.__EST_DEBUG) console.log('[Randy] stack result — added:', fresh.length, '| dupes skipped:', dupes, '| total:', estLines.length);
 }
 
 
@@ -5452,14 +5501,25 @@ function buildEstimateTab() {
 
       <!-- QUICK SCOPE AUTO-BUILDER -->
       <div class="db-sec">&#x26A1; Quick Scope Auto-Builder</div>
-      <div class="tpl-banner">
-        <span style="font-size:12px;font-weight:700;color:var(--text2)">GAF Templates:</span>
-        <button class="tpl-btn" onclick="loadGAFTemplate('hdz')">HDZ Shingle Full</button>
-        <button class="tpl-btn" onclick="loadGAFTemplate('cs')">Camelot II CS</button>
-        <button class="tpl-btn" onclick="loadGAFTemplate('redeckonly')">Redeck Only</button>
-        <button class="tpl-btn" onclick="loadGAFTemplate('gutters')">Gutters Only</button>
-        <button class="tpl-btn" onclick="loadGAFTemplate('supplement')">Supplement Add-ons</button>
-        <button class="tpl-btn" onclick="loadGAFTemplate('flat')">Flat/Mod-Bit</button>
+      <div class="tpl-banner" style="flex-direction:column;align-items:flex-start;gap:10px;padding:14px 16px">
+        <!-- Row 1: LOAD FRESH (replace mode) -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
+          <span style="font-size:10px;font-weight:900;color:#64748b;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;min-width:72px">Load Fresh:</span>
+          <button class="tpl-btn" style="border-color:#1345A8;color:#1345A8;font-weight:800" onclick="loadGAFTemplate('hdz',true)">HDZ Shingle</button>
+          <button class="tpl-btn" style="border-color:#1345A8;color:#1345A8;font-weight:800" onclick="loadGAFTemplate('cs',true)">Camelot II CS</button>
+          <button class="tpl-btn" style="border-color:#1345A8;color:#1345A8;font-weight:800" onclick="loadGAFTemplate('redeckonly',true)">Redeck Only</button>
+          <button class="tpl-btn" style="border-color:#1345A8;color:#1345A8;font-weight:800" onclick="loadGAFTemplate('flat',true)">Flat/Mod-Bit</button>
+          <button class="tpl-btn" style="margin-left:auto;border-color:#dc2626;color:#dc2626;font-weight:800" onclick="clearEstimate()" title="Clear all line items">🗑 Clear All</button>
+        </div>
+        <!-- Row 2: STACK (append mode) -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
+          <span style="font-size:10px;font-weight:900;color:#15803d;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;min-width:72px">+ Stack:</span>
+          <button class="tpl-btn" style="border-color:#15803d;color:#15803d;font-weight:800" onclick="loadGAFTemplate('gutters')">+ Gutters</button>
+          <button class="tpl-btn" style="border-color:#15803d;color:#15803d;font-weight:800" onclick="loadGAFTemplate('siding')">+ Siding / Soffit</button>
+          <button class="tpl-btn" style="border-color:#15803d;color:#15803d;font-weight:800" onclick="loadGAFTemplate('supplement')">+ Supplement Add-ons</button>
+          <button class="tpl-btn" style="border-color:#15803d;color:#15803d;font-weight:800" onclick="loadGAFTemplate('hdz')">+ Add Roof Layer</button>
+          <span id="est-line-stack-info" style="margin-left:auto;font-size:11px;font-weight:700;color:#64748b"></span>
+        </div>
       </div>
 
       <!-- LINE ITEMS -->
@@ -5875,10 +5935,30 @@ function renderEstLines() {
   const fmt3 = v => v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const rowClass = isEst ? 'li-r li-r-est' : 'li-r li-r-mo';
 
+  // Update stack info counter
+  const stackGroups = [...new Set(estLines.map(l => l._tplGroup).filter(Boolean))];
+  const stackInfo = document.getElementById('est-line-stack-info');
+  if (stackInfo) {
+    if (stackGroups.length > 1) stackInfo.textContent = stackGroups.length + ' templates stacked · ' + estLines.length + ' lines';
+    else if (estLines.length > 0) stackInfo.textContent = estLines.length + ' line' + (estLines.length>1?'s':'');
+    else stackInfo.textContent = '';
+  }
+
+  let lastGroup = null;
   c.innerHTML = estLines.map((l, i) => {
     const lineTotal = (l.qty || 0) * (l.price || 0);
     const isLabor   = (l.xCode || '').toUpperCase().startsWith('RFG') && (l.product||'').toLowerCase().includes('labor');
     const isMOhide  = !isEst && (l.trade||'').includes('Labor') && (l.product||'').toLowerCase().includes('n/a');
+
+    // ── Group separator (only in estimate view, only when multiple templates) ──
+    let groupHeader = '';
+    if (isEst && l._tplGroup && l._tplGroup !== lastGroup && stackGroups.length > 1) {
+      lastGroup = l._tplGroup;
+      groupHeader = \`<div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;padding:5px 10px;
+        background:linear-gradient(90deg,var(--surface2),transparent);border-left:3px solid var(--primary);border-radius:0 6px 6px 0">
+        <span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:.06em;text-transform:uppercase">\${l._tplGroup}</span>
+      </div>\`;
+    }
 
     if (isMOhide) {
       // Labor lines are hidden in MO view (they're Xactimate-only)
@@ -5898,12 +5978,20 @@ function renderEstLines() {
     if (isEst) {
       // ESTIMATE VIEW — show description, xactimate code badge, notes toggle
       const xc = l.xCode || '';
-      return `
-        <div class="${rowClass}">
+      const suppBadge = l.isSupplement
+        ? `<span style="font-size:9px;font-weight:900;color:#c2410c;background:#ffedd5;padding:2px 7px;border-radius:10px;letter-spacing:.04em;cursor:pointer"
+            title="Toggle supplement flag" onclick="estLines[${i}].isSupplement=!estLines[${i}].isSupplement;renderEstLines()">SUPP</span>`
+        : `<span style="font-size:9px;font-weight:700;color:#94a3b8;cursor:pointer;opacity:.5" title="Mark as supplement"
+            onclick="estLines[${i}].isSupplement=true;renderEstLines()">+supp</span>`;
+      return groupHeader + `
+        <div class="${rowClass}" style="${l.isSupplement ? 'border-left:3px solid #f97316;background:#fff7ed' : ''}">
           <span class="li-num">${i+1}</span>
           <div style="display:flex;flex-direction:column;gap:3px">
-            <input class="li-in" value="${(l.desc||'').replace(/"/g,'&quot;')}" placeholder="Description"
-              onchange="estLines[${i}].desc=this.value"/>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input class="li-in" value="${(l.desc||'').replace(/"/g,'&quot;')}" placeholder="Description"
+                onchange="estLines[${i}].desc=this.value" style="flex:1"/>
+              ${suppBadge}
+            </div>
             ${xc ? `<div style="display:flex;align-items:center;gap:6px;margin-top:1px">
               <span class="li-xcode">${xc}</span>
               ${l.notes ? `<span style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;opacity:.7"
@@ -5952,6 +6040,17 @@ function renderEstLines() {
 // ─── RECALC ESTIMATE TOTALS ──────────────────────────────────────────────────
 
 // ── O&P rate selector ────────────────────────────────────────────────────────
+
+// ── Clear estimate with confirmation ─────────────────────────────────────────
+function clearEstimate() {
+  if (estLines.length === 0) { showToast('Estimate is already empty.', 'info'); return; }
+  if (!confirm('Clear all ' + estLines.length + ' line item(s)?\n\nThis cannot be undone.')) return;
+  estLines = [];
+  renderEstLines();
+  recalcEst();
+  showToast('🗑 Estimate cleared.', 'info');
+}
+// ─────────────────────────────────────────────────────────────────────────────
 function applyOHP(val) {
   const rate = parseFloat(val) || 0;
   const ohRow = document.getElementById('et-oh-lbl')?.closest('.tr');
