@@ -5442,9 +5442,10 @@ function buildEstimateTab() {
         </div>
         <div class="fg">
           <label>O&amp;P Rate</label>
-          <select id="est-ohp">
+          <select id="est-ohp" onchange="applyOHP(this.value)">
             <option value="5">5% / 5% (Roof Only)</option>
             <option value="10">10% / 10% (Full Exterior)</option>
+            <option value="0">0% / 0% (No O&amp;P)</option>
           </select>
         </div>
       </div>
@@ -5949,16 +5950,31 @@ function renderEstLines() {
 }
 
 // ─── RECALC ESTIMATE TOTALS ──────────────────────────────────────────────────
+
+// ── O&P rate selector ────────────────────────────────────────────────────────
+function applyOHP(val) {
+  const rate = parseFloat(val) || 0;
+  const ohRow = document.getElementById('et-oh-lbl')?.closest('.tr');
+  const prRow = document.getElementById('et-pr-lbl')?.closest('.tr');
+  if (ohRow) ohRow.style.display = rate > 0 ? '' : 'none';
+  if (prRow) prRow.style.display = rate > 0 ? '' : 'none';
+  recalcEst();
+  if (rate === 0) showToast('O&P removed — estimate is materials + labor subtotal only.', 'info');
+}
+// ─────────────────────────────────────────────────────────────────────────────
 function recalcEst() {
   if (window.__EST_DEBUG) console.log('[Randy] recalcEst — lines:', estLines.length, '| raw data:', JSON.parse(JSON.stringify(estLines)));
   const sub = estLines.reduce((s, l) => s + (parseFloat(l.qty)||0) * (parseFloat(l.price)||0), 0);
   const el  = id => document.getElementById(id);
   const fmt = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-  const inclOH = el('op-include-overhead') ? el('op-include-overhead').checked : true;
-  const inclPR = el('op-include-profit')   ? el('op-include-profit').checked   : true;
-  const ohPct  = el('op-overhead-pct') ? (parseFloat(el('op-overhead-pct').value) || 0) / 100 : 0.10;
-  const prPct  = el('op-profit-pct')   ? (parseFloat(el('op-profit-pct').value)  || 0) / 100 : 0.10;
+  // Read O&P rate from est-ohp dropdown (primary source)
+  const ohpSel  = el('est-ohp');
+  const ohpRate = ohpSel ? parseFloat(ohpSel.value) || 0 : 10;
+  const inclOH  = ohpRate > 0 && (el('op-include-overhead') ? el('op-include-overhead').checked : true);
+  const inclPR  = ohpRate > 0 && (el('op-include-profit')   ? el('op-include-profit').checked   : true);
+  const ohPct   = el('op-overhead-pct') ? (parseFloat(el('op-overhead-pct').value) || ohpRate) / 100 : ohpRate / 100;
+  const prPct   = el('op-profit-pct')   ? (parseFloat(el('op-profit-pct').value)  || ohpRate) / 100 : ohpRate / 100;
 
   const oh     = inclOH ? sub * ohPct : 0;
   const profit = inclPR ? sub * prPct : 0;
@@ -6107,10 +6123,12 @@ async function exportEstimatePDF() {
   const adjEmail = fv('est-adjemail');
   const docType  = fv('est-doctype') || 'Insurance Supplement';
 
-  const inclOH = document.getElementById('op-include-overhead')?.checked ?? true;
-  const inclPR = document.getElementById('op-include-profit')?.checked   ?? true;
-  const ohPct  = (parseFloat(document.getElementById('op-overhead-pct')?.value) || 10) / 100;
-  const prPct  = (parseFloat(document.getElementById('op-profit-pct')?.value)   || 10) / 100;
+  const ohpSelEl = document.getElementById('est-ohp');
+  const ohpRate  = ohpSelEl ? parseFloat(ohpSelEl.value) || 0 : 10;
+  const inclOH   = ohpRate > 0;
+  const inclPR   = ohpRate > 0;
+  const ohPct    = ohpRate / 100;
+  const prPct    = ohpRate / 100;
 
   const sub    = estLines.reduce((s,l) => s + (l.qty||0)*(l.price||0), 0);
   const oh     = inclOH ? sub * ohPct : 0;
@@ -6411,10 +6429,12 @@ async function exportEstimatePDF() {
 
 function printEstimate() {
   const fmt = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const inclOH = document.getElementById('op-include-overhead')?.checked ?? true;
-  const inclPR = document.getElementById('op-include-profit')?.checked   ?? true;
-  const ohPct  = (parseFloat(document.getElementById('op-overhead-pct')?.value) || 10) / 100;
-  const prPct  = (parseFloat(document.getElementById('op-profit-pct')?.value)  || 10) / 100;
+  const ohpSelEl2 = document.getElementById('est-ohp');
+  const ohpRate2  = ohpSelEl2 ? parseFloat(ohpSelEl2.value) || 0 : 10;
+  const inclOH = ohpRate2 > 0;
+  const inclPR = ohpRate2 > 0;
+  const ohPct  = ohpRate2 / 100;
+  const prPct  = ohpRate2 / 100;
   const sub    = estLines.reduce((s,l)=>s+(l.qty||0)*(l.price||0),0);
   const oh     = inclOH ? sub * ohPct : 0;
   const profit = inclPR ? sub * prPct : 0;
