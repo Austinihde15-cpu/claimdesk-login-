@@ -4812,8 +4812,38 @@ const GAF_TEMPLATES = {
 // ─── LOAD GAF TEMPLATE ───────────────────────────────────────────────────────
 function loadGAFTemplate(key) {
   if (!key) return;
-  const tpl = GAF_TEMPLATES[key];
-  if (!tpl) return;
+  // Alias map: short button keys → actual GAF_TEMPLATES keys
+  const ALIAS = {
+    'hdz':        'hdz_charcoal',   // default HDZ color
+    'cs':         'bd_chestnut',    // Camelot II CS → BoardDeck (best match)
+    'redeckonly': 'hdz_insurance',  // insurance/redeck build
+    'gutters':    'flatroof_modbit',// no standalone gutters template — use supplement fallback below
+    'supplement': 'hdz_insurance',
+    'flat':       'flatroof_modbit',
+  };
+  const resolvedKey = ALIAS[key] || key;
+  const tpl = GAF_TEMPLATES[resolvedKey];
+  if (!tpl) {
+    // If still not found, try to build a minimal gutters-only template on the fly
+    if (key === 'gutters') {
+      const gutterLines = [
+        { trade:'Gutters & Drainage', product:'6" K-Style Aluminum Gutter — .032 gauge', desc:'6" K-Style Seamless Aluminum Gutter — Installed', qty:120, unit:'LF', price:8.49, xCode:'GUT200', notes:'Full perimeter per SMACNA drainage standards.' },
+        { trade:'Gutters & Drainage', product:'3x4 Aluminum Downspout', desc:'3×4 Rectangular Aluminum Downspouts — Installed', qty:4, unit:'EA', price:95.00, xCode:'GUT230', notes:'Min 1 per 40 LF per IRC R903.4.' },
+        { trade:'Gutters & Drainage', product:'Gutter Guard / Leaf Filter', desc:'Gutter Screen / Leaf Guard — Install', qty:120, unit:'LF', price:3.25, xCode:'GUT240', notes:'Owner request — maintains warranty.' },
+        { trade:'Gutters & Drainage', product:'Fascia Board — 2×6 Primed', desc:'Fascia Board Replacement — Rotted sections', qty:40, unit:'LF', price:4.75, xCode:'FRM200', notes:'Carrier scope missing — required for gutter reattachment.' },
+      ];
+      if (estLines.length > 0 && !confirm('Load "Gutters & Drainage"?
+
+This will replace your current ' + estLines.length + ' line item(s).')) return;
+      estLines = gutterLines;
+      renderEstLines();
+      recalcEst();
+      showToast('✅ Loaded: Gutters & Drainage — 4 items. Update LF to field measurements.', 'success');
+      return;
+    }
+    showToast('Template "' + key + '" not found.', 'error');
+    return;
+  }
   if (estLines.length > 0 && !confirm('Load "' + tpl.name + '"?\n\nThis will replace your current ' + estLines.length + ' line item(s).')) return;
   // Map template items → internal estLines format
   estLines = tpl.items.map(it => ({
@@ -5001,7 +5031,7 @@ function renderDBInner() {
 
   // ── Post-render ───────────────────────────────────────────────────────────
   if (!DS.job && !DS.blankMode) dbLoadJobs();
-  if (DS.tab === 'estimate' ) { recalcEst(); setTimeout(updateQATrade, 50); }
+  if (DS.tab === 'estimate' ) { renderEstLines(); recalcEst(); setTimeout(updateQATrade, 50); }
   if (DS.tab === 'workorder') recalcWO();
   if (DS.tab === 'matorder' ) recalcMO();
 }
@@ -5354,7 +5384,8 @@ function buildEstimateTab() {
 
       <!-- Line items table -->
       <div id="est-lines-wrap">
-        ${renderEstLines()}
+        <div id="est-lines"></div>
+        <span id="li-count-label" style="font-size:11px;color:var(--text2);display:block;margin-top:6px;text-align:right"></span>
       </div>
 
       <!-- Totals + actions -->
@@ -5794,6 +5825,7 @@ function recalcEst() {
   const tax    = sub * 0.09679;
   const grand  = sub + oh + profit + tax;
 
+  // Write to est-* IDs (supplement/estimate view)
   if (el('est-subtotal'))       el('est-subtotal').textContent = fmt(sub);
   if (el('est-overhead-row'))   el('est-overhead-row').style.display = inclOH ? '' : 'none';
   if (el('est-overhead-lbl'))   el('est-overhead-lbl').textContent = 'Overhead (' + (ohPct*100).toFixed(1).replace(/\.0$/, '') + '%)';
@@ -5803,6 +5835,15 @@ function recalcEst() {
   if (el('est-profit'))         el('est-profit').textContent = fmt(profit);
   if (el('est-tax'))            el('est-tax').textContent = fmt(tax);
   if (el('est-grand'))          el('est-grand').textContent = fmt(grand);
+  // Also write to et-* IDs (doc builder totals box)
+  if (el('et-sub'))             el('et-sub').textContent  = fmt(sub);
+  if (el('et-oh'))              el('et-oh').textContent   = fmt(oh);
+  if (el('et-oh-lbl'))          el('et-oh-lbl').textContent = 'Overhead (' + (ohPct*100).toFixed(1).replace(/\.0$/, '') + '%)';
+  if (el('et-pr'))              el('et-pr').textContent   = fmt(profit);
+  if (el('et-pr-lbl'))          el('et-pr-lbl').textContent = 'Profit (' + (prPct*100).toFixed(1).replace(/\.0$/, '') + '%)';
+  if (el('et-tax'))             el('et-tax').textContent  = fmt(tax);
+  if (el('et-total'))           el('et-total').textContent = fmt(grand);
+  if (el('est-ohp'))            el('est-ohp').textContent  = fmt(oh + profit);
 }
 
 // ─── BLANK LINE / CLEAR ──────────────────────────────────────────────────────
