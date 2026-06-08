@@ -2407,10 +2407,11 @@ function claimRow(c) {
     <td>${statusBadge(c.status)}</td>
     <td><span style="color:${(c.stall_score||0)>=80?'var(--red)':(c.stall_score||0)>=50?'var(--orange)':'var(--text2)'};font-weight:600">${c.stall_score||0}</span></td>
     <td class="text-sm text-muted">${(c.assigned_rep||'--').split('@')[0]}</td>
-    <td onclick="event.stopPropagation()">
-      <button class="btn btn-primary btn-sm" onclick="goto('claim','${c.id}')">Open -></button>
+    <td onclick="event.stopPropagation()" style="white-space:nowrap">
+      <button class="btn btn-primary btn-sm" onclick="goto('claim','${c.id}')">Open →</button>
+      <button class="btn btn-sm" onclick="openPhotoSession('${c.id}',${JSON.stringify({id:c.id,job_number:c.job_number,insured_name:c.insured_name,address:c.address,city:c.city,state:c.state,damage_type:c.damage_type,date_of_loss:c.date_of_loss,carrier:c.carrier,claim_number:c.claim_number,notes:c.notes,open_items:c.open_items,cox_rcv:c.cox_rcv,carrier_rcv:c.carrier_rcv})})" style="background:linear-gradient(135deg,#0d6e3f,#16a34a);color:#fff;font-weight:800;border:none;margin-left:4px">📸</button>
     </td>
-  </tr>`;
+  </tr>\`;
 }
 
 function filterClaims(f) {
@@ -9236,7 +9237,90 @@ function openPhotoSession(claimId, claimObj) {
   goto('photochecklist');
 }
 
-async function analyzePhotosWithRandy() {
+async async function analyzePhotosWithRandy() {
+  const totalPhotos = Object.keys(pcState.photos).length;
+  if (totalPhotos === 0) { showToast('No photos yet — upload at least one photo first.','warning'); return; }
+  const btn = document.getElementById('pc-analyze-btn');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ Analyzing...'; }
+
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  const covered=[], missing=[], withNotes=[];
+  if (checklist) {
+    checklist.sections.forEach(s => s.items.forEach(i => {
+      if (pcState.photos[i.id]) {
+        covered.push(i.label);
+        if (pcState.photos[i.id].note) withNotes.push(`${i.label}: "${pcState.photos[i.id].note}"`);
+      } else if (i.required) missing.push(i.label);
+    }));
+  }
+
+  const prompt = `You are Randy, Cox Roofing & Restoration AI field assistant. Analyze this photo session status for supplement strength.
+
+JOB: #${pcState.jobNum} — ${pcState.homeowner}
+ADDRESS: ${pcState.address}
+DAMAGE: ${(pcState.claimType||'hail').toUpperCase()} | DOL: ${pcState.lossDate||'unknown'}
+JOB TYPE: ${(PHOTO_CHECKLISTS[pcState.jobType]||{}).label||pcState.jobType}
+SCOPE NOTES: ${pcState.scopeNote||'none'}
+
+PHOTO STATUS:
+- Total photos captured: ${totalPhotos}
+- Required items COVERED (${covered.length}): ${covered.slice(0,15).join(', ')}
+- Required items MISSING (${missing.length}): ${missing.join(', ')||'none — all covered'}
+- Photos with field notes (${withNotes.length}): ${withNotes.slice(0,5).join(' | ')||'none'}
+
+Provide a concise field analysis:
+1. COVERAGE SCORE: X/10 — one sentence why
+2. STRONGEST SHOTS for supplement: list top 3 covered items and why each matters
+3. CRITICAL GAPS: top 3 missing shots and exact supplement line items they support
+4. UNIFORMITY ARGUMENT STATUS: can we build full replacement argument with current photos? yes/partial/no — one sentence
+5. NEXT ACTION: one clear sentence for Austin/crew to do right now
+
+Keep response tight — this is a field tool, not a report. Under 250 words.`;
+
+  try {
+    const task = prompt;
+    const claim = { job_number: pcState.jobNum, address: pcState.address, damage_type: pcState.claimType };
+    const user = state.user?.email || '';
+    const res = await fetch('https://v-edb7126c.base44.app/functions/randyGateway', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task, claim, user })
+    });
+    const data = await res.json();
+    if (btn) { btn.disabled=false; btn.textContent='🤖 Analyze'; }
+
+    const result = data.result || data.error || 'No response from Randy.';
+
+    // Show result in a modal
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:600px;width:95%">
+        <div class="modal-header" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:12px 12px 0 0;padding:16px 20px">
+          <div style="font-size:16px;font-weight:900">🤖 Randy — Photo Analysis</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px">Job #${pcState.jobNum} · ${pcState.homeowner} · ${totalPhotos} photos reviewed</div>
+          <button onclick="this.closest('.modal-overlay').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1">×</button>
+        </div>
+        <div class="modal-body" style="padding:20px;background:#fff;border-radius:0 0 12px 12px">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;font-size:13.5px;line-height:1.7;color:#1e293b;white-space:pre-wrap;font-family:inherit">${result.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(result)}).then(()=>showToast('Copied!','success'))" class="btn btn-ghost btn-sm" style="font-weight:700">📋 Copy Analysis</button>
+            <button onclick="submitPhotoChecklist()" class="btn btn-primary btn-sm" style="font-weight:800">✅ Save & Submit Photos</button>
+            <button onclick="this.closest('.modal-overlay').remove()" class="btn btn-ghost btn-sm">Close</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='🤖 Analyze'; }
+    showToast('Analysis failed: ' + e.message, 'danger');
+  }
+}
+
+// legacy stub to avoid errors — real version above
+function _analyzePhotosLegacy() {
   const totalPhotos = Object.keys(pcState.photos).length;
   if (totalPhotos === 0) { showToast('No photos yet — upload at least one photo first.','warning'); return; }
   const btn = document.getElementById('pc-analyze-btn');
@@ -9292,6 +9376,65 @@ function exportPhotoLog() {
 // -------------------------------------------------------------
 //  RENDER MAIN PAGE
 // -------------------------------------------------------------
+
+// ── Photo Checklist: Submit & Clear ────────────────────────────────────────
+async function submitPhotoChecklist() {
+  const totalDone = Object.keys(pcState.photos).length;
+  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
+  let reqTotal = 0, reqDone = 0;
+  if (checklist) checklist.sections.forEach(s => s.items.forEach(i => {
+    if (i.required) { reqTotal++; if (pcState.photos[i.id]) reqDone++; }
+  }));
+
+  const msg = document.getElementById('pc-submit-status');
+  if (reqDone < reqTotal) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent = `⚠️ ${reqTotal - reqDone} required photo(s) still missing.`; }
+    showToast(`Missing ${reqTotal - reqDone} required photo(s) — complete before submitting.`, 'warning');
+    return;
+  }
+
+  // Persist session
+  savePCSession();
+
+  // Save photos to Attachment entity if claim is linked
+  if (pcState.claimId) {
+    let saved = 0;
+    for (const [itemId, photo] of Object.entries(pcState.photos)) {
+      if (!photo.dataUrl || photo._saved) continue;
+      try {
+        await entityCreate('Attachment', {
+          claim_id:      pcState.claimId,
+          file_name:     `photo_${itemId}_${Date.now()}.jpg`,
+          file_url:      photo.dataUrl,
+          document_type: 'photo',
+          tag:           itemId,
+          parse_status:  'pending',
+          notes:         photo.note || '',
+          uploaded_by:   photo.takenBy || (state.user ? state.user.full_name : 'Field'),
+          source:        'photo_checklist',
+        });
+        photo._saved = true;
+        saved++;
+      } catch(e) { console.warn('Attachment save failed:', e); }
+    }
+    if (saved > 0) showToast(`✅ ${saved} photo(s) saved to claim record`, 'success');
+  }
+
+  if (msg) { msg.style.color='var(--green)'; msg.textContent = `✅ Submitted — ${totalDone} photos on file`; }
+  showToast('📋 Photo session submitted! Photos saved to claim.', 'success');
+}
+
+function clearPhotoChecklist() {
+  if (!confirm('Clear all photos and start over?')) return;
+  pcState.photos = {};
+  if (pcState.claimId && window._pcSessions) delete window._pcSessions[pcState.claimId];
+  renderPCChecklist();
+  updatePCSummary();
+  const msg = document.getElementById('pc-submit-status');
+  if (msg) msg.textContent = '';
+  showToast('Checklist cleared.', 'info');
+}
+
 function renderPhotoChecklistPage() {
   document.getElementById('content').innerHTML = `
   <style>
@@ -9495,15 +9638,37 @@ function renderPhotoChecklistPage() {
     .photo-modal img { width:100%; border-radius:8px; }
   </style>
 
+  <!-- ══ CLAIM CONTEXT BANNER — shown when launched from a specific claim ══ -->
+  ${pcState.claimId ? \`
+  <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:14px;padding:16px 22px;margin-bottom:18px;border:1px solid #334155;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="font-size:26px">📂</div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;font-weight:800;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px">Active Job — Photo Session</div>
+      <div style="font-size:17px;font-weight:900;color:#fff;letter-spacing:-0.02em">\${pcState.homeowner || 'Homeowner'} <span style="color:#64748b;font-weight:500;font-size:14px">#\${pcState.jobNum||'--'}</span></div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:2px">\${pcState.address || 'Address not set'}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="background:\${(pcState.claimType||'hail')==='hail'?'#7f1d1d':'#78350f'};color:\${(pcState.claimType||'hail')==='hail'?'#fca5a5':'#fcd34d'};border-radius:20px;padding:4px 12px;font-size:11px;font-weight:900;letter-spacing:.05em">
+        \${(pcState.claimType||'hail').toUpperCase()}
+      </span>
+      \${pcState.lossDate ? \`<span style="background:#1e293b;color:#94a3b8;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">DOL: \${pcState.lossDate}</span>\` : ''}
+      \${pcState.scopeNote ? \`<span style="background:#1e293b;color:#94a3b8;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${pcState.scopeNote}">\${pcState.scopeNote.slice(0,45)}\${pcState.scopeNote.length>45?'…':''}</span>\` : ''}
+      <button onclick="savePCSession();goto('claim',pcState.claimId)" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">← Back to Claim</button>
+    </div>
+  </div>\` : ''}
+
   <!-- ══ DARK HERO BANNER ══ -->
   <div class="pc-hero">
     <div>
       <div class="pc-hero-title">&#x1F4F8; Crew Photo Checklist</div>
       <div class="pc-hero-sub">Required photos must be uploaded before crew pay is released. Missing required photos = pay on hold.</div>
     </div>
-    <button class="btn btn-primary" onclick="exportPhotoReport()" style="white-space:nowrap;font-weight:700;padding:10px 20px;border-radius:9px;">
-      &#x1F4C4; Export Report
-    </button>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="pc-analyze-btn" onclick="analyzePhotosWithRandy()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F916; Analyze with Randy</button>
+      <button class="btn btn-primary" onclick="exportPhotoReport()" style="white-space:nowrap;font-weight:700;padding:10px 20px;border-radius:9px;">
+        &#x1F4C4; Export Report
+      </button>
+    </div>
   </div>
 
   <!-- ══ ROLE SWITCHER ══ -->
