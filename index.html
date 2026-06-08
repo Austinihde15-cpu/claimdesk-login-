@@ -2414,7 +2414,7 @@ function claimRow(c) {
       <button class="btn btn-primary btn-sm" onclick="goto('claim','${c.id}')">Open →</button>
       <button class="btn btn-sm" onclick="openPhotoSession('${c.id}',${JSON.stringify({id:c.id,job_number:c.job_number,insured_name:c.insured_name,address:c.address,city:c.city,state:c.state,damage_type:c.damage_type,date_of_loss:c.date_of_loss,carrier:c.carrier,claim_number:c.claim_number,notes:c.notes,open_items:c.open_items,cox_rcv:c.cox_rcv,carrier_rcv:c.carrier_rcv})})" style="background:linear-gradient(135deg,#0d6e3f,#16a34a);color:#fff;font-weight:800;border:none;margin-left:4px">📸</button>
     </td>
-  </tr>\`;
+  </tr>`;
 }
 
 function filterClaims(f) {
@@ -4600,8 +4600,8 @@ window.__RANDY_TEST__ = {
     this.check_manual_add();
     this.check_recalc();
     console.groupEnd();
-    console.log(\`%c🏁 Results: \${this._pass} passed, \${this._fail} failed\`,
-      \`font-size:14px;font-weight:800;color:\${this._fail===0?'#16a34a':'#dc2626'}\`);
+    console.log(`%c🏁 Results: ${this._pass} passed, ${this._fail} failed`,
+      `font-size:14px;font-weight:800;color:${this._fail===0?'#16a34a':'#dc2626'}`);
     return { pass: this._pass, fail: this._fail };
   }
 };
@@ -5954,10 +5954,7 @@ function renderEstLines() {
     let groupHeader = '';
     if (isEst && l._tplGroup && l._tplGroup !== lastGroup && stackGroups.length > 1) {
       lastGroup = l._tplGroup;
-      groupHeader = \`<div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;padding:5px 10px;
-        background:linear-gradient(90deg,var(--surface2),transparent);border-left:3px solid var(--primary);border-radius:0 6px 6px 0">
-        <span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:.06em;text-transform:uppercase">\${l._tplGroup}</span>
-      </div>\`;
+      groupHeader = '<div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;padding:5px 10px;background:linear-gradient(90deg,var(--surface2),transparent);border-left:3px solid var(--primary);border-radius:0 6px 6px 0"><span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:.06em;text-transform:uppercase">' + (l._tplGroup||'') + '</span></div>';
     }
 
     if (isMOhide) {
@@ -5979,10 +5976,8 @@ function renderEstLines() {
       // ESTIMATE VIEW — show description, xactimate code badge, notes toggle
       const xc = l.xCode || '';
       const suppBadge = l.isSupplement
-        ? `<span style="font-size:9px;font-weight:900;color:#c2410c;background:#ffedd5;padding:2px 7px;border-radius:10px;letter-spacing:.04em;cursor:pointer"
-            title="Toggle supplement flag" onclick="estLines[${i}].isSupplement=!estLines[${i}].isSupplement;renderEstLines()">SUPP</span>`
-        : `<span style="font-size:9px;font-weight:700;color:#94a3b8;cursor:pointer;opacity:.5" title="Mark as supplement"
-            onclick="estLines[${i}].isSupplement=true;renderEstLines()">+supp</span>`;
+        ? '<span style="font-size:9px;font-weight:900;color:#c2410c;background:#ffedd5;padding:2px 7px;border-radius:10px;letter-spacing:.04em;cursor:pointer" title="Toggle supplement flag" onclick="estLines['+i+'].isSupplement=!estLines['+i+'].isSupplement;renderEstLines()">SUPP</span>'
+        : '<span style="font-size:9px;font-weight:700;color:#94a3b8;cursor:pointer;opacity:.5" title="Mark as supplement" onclick="estLines['+i+'].isSupplement=true;renderEstLines()">+supp</span>';
       return groupHeader + `
         <div class="${rowClass}" style="${l.isSupplement ? 'border-left:3px solid #f97316;background:#fff7ed' : ''}">
           <span class="li-num">${i+1}</span>
@@ -9918,7 +9913,7 @@ function openPhotoSession(claimId, claimObj) {
   goto('photochecklist');
 }
 
-async async function analyzePhotosWithRandy() {
+async function analyzePhotosWithRandy() {
   const totalPhotos = Object.keys(pcState.photos).length;
   if (totalPhotos === 0) { showToast('No photos yet — upload at least one photo first.','warning'); return; }
   const btn = document.getElementById('pc-analyze-btn');
@@ -10000,39 +9995,6 @@ Keep response tight — this is a field tool, not a report. Under 250 words.`;
   }
 }
 
-// legacy stub to avoid errors — real version above
-function _analyzePhotosLegacy() {
-  const totalPhotos = Object.keys(pcState.photos).length;
-  if (totalPhotos === 0) { showToast('No photos yet — upload at least one photo first.','warning'); return; }
-  const btn = document.getElementById('pc-analyze-btn');
-  if (btn) { btn.disabled=true; btn.textContent='⏳ Analyzing...'; }
-  const checklist = PHOTO_CHECKLISTS[pcState.jobType];
-  const covered=[], missing=[];
-  if (checklist) {
-    checklist.sections.forEach(s => s.items.forEach(i => {
-      if (pcState.photos[i.id]) covered.push(i.label);
-      else if (i.required) missing.push(i.label);
-    }));
-  }
-  const prompt = `You are Randy, Cox Roofing & Restoration AI field assistant.\n\nJOB: #${pcState.jobNum} — ${pcState.homeowner}\nADDRESS: ${pcState.address}\nDAMAGE: ${(pcState.claimType||'hail').toUpperCase()} | DOL: ${pcState.lossDate||'unknown'}\nJOB TYPE: ${(PHOTO_CHECKLISTS[pcState.jobType]||{}).label||pcState.jobType}\nSCOPE: ${pcState.scopeNote||'none'}\n\nPHOTO STATUS:\n- Photos uploaded: ${totalPhotos}\n- Required items COVERED (${covered.length}): ${covered.slice(0,10).join(', ')}\n- Required items MISSING (${missing.length}): ${missing.join(', ')||'none'}\n\nProvide:\n1. COVERAGE SUMMARY — which supplement-critical shots are confirmed\n2. MISSING CRITICAL SHOTS — what is missing and exactly how to get each shot\n3. SUPPLEMENT STRENGTH rating: Weak / Fair / Strong / Excellent\n4. NEXT 3 SHOTS — highest priority shots with specific field instructions\n5. UNIFORMITY NOTE — if full exterior/siding/windows, evaluate whether current shots support the cannot-match uniformity argument\n\nContractor-only language. No policy references. Practical field guidance only.`;
-  try {
-    const r = await callFunction('randyGateway',{prompt,context:'photo_analysis'});
-    if (btn) { btn.disabled=false; btn.innerHTML='&#x1F916; Analyze with Randy'; }
-    if (r && r.response) {
-      // Show result overlay
-      let ov = document.getElementById('pc-analysis-ov');
-      if (ov) ov.remove();
-      ov = document.createElement('div');
-      ov.id = 'pc-analysis-ov';
-      ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';
-      ov.innerHTML=`<div style="background:#0f172a;color:#e2e8f0;border-radius:16px;padding:28px 32px;max-width:720px;width:100%;margin:auto;box-shadow:0 24px 64px rgba(0,0,0,.6);border:1px solid #334155;position:relative"><button onclick="document.getElementById('pc-analysis-ov').remove()" style="position:absolute;top:16px;right:16px;background:#334155;border:none;color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:700">✕ Close</button><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><span style="font-size:28px">🤖</span><div><div style="font-size:17px;font-weight:800">Randy — Photo Analysis</div><div style="font-size:12px;color:#64748b">#${pcState.jobNum} · ${pcState.homeowner} · ${covered.length} covered, ${missing.length} missing</div></div></div><div style="background:#1e293b;border-radius:10px;padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;border:1px solid #334155;max-height:60vh;overflow-y:auto">${r.response.replace(/</g,'&lt;')}</div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button onclick="document.getElementById('pc-analysis-ov').remove()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px">✓ Back to Checklist</button><button onclick="exportPhotoLog()" style="background:#334155;color:#e2e8f0;border:none;border-radius:8px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:13px">📋 Export Log</button></div></div>`;
-      document.body.appendChild(ov);
-    } else { showToast('Analysis returned empty. Try again.','error'); }
-  } catch(e) {
-    if (btn) { btn.disabled=false; btn.innerHTML='&#x1F916; Analyze with Randy'; }
-    showToast('Analysis failed: '+e.message,'error');
-  }
-}
 
 function exportPhotoLog() {
   const cl = PHOTO_CHECKLISTS[pcState.jobType];
