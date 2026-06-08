@@ -1232,10 +1232,10 @@ input[type=file] { display: none; }
 <!-- SIDEBAR -->
 <div id="sidebar" style="display:none;">
   <div class="logo">
-    <img src="https://media.base44.com/images/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" alt="Cox"/>
+    <img src="https://media.base44.com/images/public/6a0ec85f9e963ce8edb7126c/efe58e3c4_cox_logo.jpg" id="sidebar-logo-img" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;" alt="Logo"/>
     <div>
       <div class="logo-text">ClaimDesk</div>
-      <div class="logo-sub">Cox Roofing</div>
+      <div class="logo-sub" id="sidebar-company-name">ClaimDesk</div>
     </div>
   </div>
   <nav>
@@ -1405,21 +1405,78 @@ function buildLoginScreen(mode){
       <div id="forgot-msg" style="font-size:13px;text-align:center;margin-top:12px;min-height:18px;font-weight:500;"></div>
     </div>
 
-    <!-- REQUEST ACCESS PANEL -->
+    <!-- SIGNUP — PLAN REQUIRED -->
     <div id="panel-signup" style="display:none;">
-      <button onclick="showSigninPanel()" style="background:none;border:none;color:#1345A8;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-bottom:16px;padding:0;">&#x2190; Back to Sign In</button>
-      <div style="margin-bottom:20px;">
-        <div style="font-size:18px;font-weight:800;color:#001A40;margin-bottom:4px;">Request Access</div>
-        <div style="font-size:13px;color:#64748B;">ClaimDesk is invitation-only. Contact your admin to get a sign-up link.</div>
+      <button onclick="showSigninPanel()" style="background:none;border:none;color:#1345A8;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-bottom:14px;padding:0;">&#x2190; Back to Sign In</button>
+      <div style="margin-bottom:14px;">
+        <div style="font-size:18px;font-weight:800;color:#001A40;margin-bottom:3px;">Create Your Account</div>
+        <div style="font-size:12px;color:#64748B;">Choose a plan to get started &mdash; cancel anytime</div>
       </div>
-      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:16px;text-align:center;">
-        <div style="font-size:13px;font-weight:700;color:#002868;margin-bottom:6px;">Contact Austin Ihde</div>
-        <div style="font-size:13px;color:#1345A8;margin-bottom:4px;">&#x1F4DE; (314) 695-3868</div>
-        <div style="font-size:13px;color:#1345A8;">&#x1F4E7; Austin@coxroof.com</div>
-      </div>
-      <div style="margin-top:16px;font-size:12px;color:#94A3B8;text-align:center;">Your admin will send you a personalized invite link.</div>
-    </div>
 
+      <!-- Plan selector -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:#475569;display:block;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Select Plan</label>
+        <div id="plan-cards" style="display:flex;flex-direction:column;gap:7px;">
+
+          <label id="plan-starter-card" style="display:flex;align-items:center;gap:10px;border:2px solid #E2E8F0;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;"
+            onclick="selectPlan('starter')">
+            <input type="radio" name="reg-plan" value="starter" style="accent-color:#1345A8;width:15px;height:15px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#001A40;">Starter <span style="font-size:11px;font-weight:600;color:#1345A8;margin-left:4px;">$199/mo</span></div>
+              <div style="font-size:11px;color:#64748B;">2 seats &bull; Unlimited estimates &bull; 4% success fee</div>
+            </div>
+          </label>
+
+          <label id="plan-growth-card" style="display:flex;align-items:center;gap:10px;border:2px solid #E2E8F0;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;"
+            onclick="selectPlan('growth')">
+            <input type="radio" name="reg-plan" value="growth" style="accent-color:#1345A8;width:15px;height:15px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#001A40;">Growth <span style="font-size:11px;font-weight:600;color:#1345A8;margin-left:4px;">$499/mo</span>
+                <span style="font-size:10px;font-weight:700;color:#fff;background:#d97706;border-radius:4px;padding:1px 5px;margin-left:4px;">POPULAR</span>
+              </div>
+              <div style="font-size:11px;color:#64748B;">8 seats &bull; Unlimited estimates &bull; 4% success fee</div>
+            </div>
+          </label>
+
+          <label id="plan-enterprise-card" style="display:flex;align-items:center;gap:10px;border:2px solid #E2E8F0;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;"
+            onclick="selectPlan('enterprise')">
+            <input type="radio" name="reg-plan" value="enterprise" style="accent-color:#1345A8;width:15px;height:15px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#001A40;">Enterprise <span style="font-size:11px;font-weight:600;color:#1345A8;margin-left:4px;">$999/mo</span></div>
+              <div style="font-size:11px;color:#64748B;">Unlimited seats &bull; API access &bull; 4% success fee</div>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Company Name</label>
+      <input id="reg-company" type="text" placeholder="Acme Roofing &amp; Restoration"
+        style="width:100%;padding:10px 13px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:13px;outline:none;margin-bottom:8px;font-family:inherit;"
+        onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Your Name</label>
+      <input id="reg-name" type="text" placeholder="John Smith"
+        style="width:100%;padding:10px 13px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:13px;outline:none;margin-bottom:8px;font-family:inherit;"
+        onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Work Email</label>
+      <input id="reg-email" type="email" placeholder="you@yourcompany.com"
+        style="width:100%;padding:10px 13px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:13px;outline:none;margin-bottom:8px;font-family:inherit;"
+        onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;">Password</label>
+      <input id="reg-pass" type="password" placeholder="Min. 8 characters"
+        style="width:100%;padding:10px 13px;background:#F8F9FB;border:1.5px solid #E2E8F0;border-radius:9px;color:#0F172A;font-size:13px;outline:none;margin-bottom:8px;font-family:inherit;"
+        onkeydown="if(event.key==='Enter')doRegister()"
+        onfocus="this.style.borderColor='#1345A8'" onblur="this.style.borderColor='#E2E8F0'">
+      <div id="reg-msg" style="font-size:12px;color:#dc2626;min-height:16px;margin-bottom:8px;font-weight:600;"></div>
+      <button id="reg-btn" onclick="doRegister()"
+        style="width:100%;padding:13px;background:linear-gradient(135deg,#001A40,#1345A8);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:-.01em;">
+        Subscribe &amp; Create Account &#x2192;
+      </button>
+      <div style="margin-top:10px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.6;">
+        Billing begins immediately. Cancel anytime in Settings.<br>
+        By signing up you agree to our <a href="https://myelitetrack.com/terms" target="_blank" style="color:#1345A8;text-decoration:underline;">Terms of Service</a>.
+      </div>
+    </div>
 
     <!-- CREATE ACCOUNT PANEL (invite activation) -->
     <div id="panel-invite" style="display:none;">
@@ -1481,6 +1538,70 @@ function showSignupPanel(){
   document.getElementById('panel-signin').style.display='none';
   document.getElementById('panel-forgot').style.display='none';
   document.getElementById('panel-signup').style.display='block';
+}
+
+// ── Plan selection highlight ──────────────────────────────────────────
+function selectPlan(plan){
+  ['starter','growth','enterprise'].forEach(function(p){
+    const card = document.getElementById('plan-'+p+'-card');
+    const radio = document.querySelector('input[name="reg-plan"][value="'+p+'"]');
+    if (card) card.style.borderColor = (p === plan) ? '#1345A8' : '#E2E8F0';
+    if (card) card.style.background  = (p === plan) ? '#EFF6FF' : '';
+    if (radio) radio.checked = (p === plan);
+  });
+}
+
+// ── Self-Registration (paid plan required) ────────────────────────────
+async function doRegister(){
+  const radio   = document.querySelector('input[name="reg-plan"]:checked');
+  const company = (document.getElementById('reg-company')||{value:''}).value.trim();
+  const name    = (document.getElementById('reg-name')||{value:''}).value.trim();
+  const email   = (document.getElementById('reg-email')||{value:''}).value.trim();
+  const pass    = (document.getElementById('reg-pass')||{value:''}).value;
+  const msgEl   = document.getElementById('reg-msg');
+  const btn     = document.getElementById('reg-btn');
+  if (msgEl) msgEl.textContent = '';
+  if (!radio)        { if(msgEl) msgEl.textContent='Please select a plan.'; return; }
+  if (!company)      { if(msgEl) msgEl.textContent='Enter your company name.'; return; }
+  if (!name)         { if(msgEl) msgEl.textContent='Enter your name.'; return; }
+  if (!email)        { if(msgEl) msgEl.textContent='Enter your work email.'; return; }
+  if (!pass || pass.length < 8){ if(msgEl) msgEl.textContent='Password must be at least 8 characters.'; return; }
+  const plan = radio.value;
+  if (btn){ btn.textContent='Creating account\u2026'; btn.disabled=true; }
+  try {
+    const r = await callFunction('authRegister',{company_name:company,owner_name:name,email,password:pass,plan});
+    if (r && r.ok){
+      saveSession(r.user, r.company);
+      const ls = document.getElementById('login-screen'); if(ls) ls.remove();
+      const fb = document.getElementById('static-login-fallback'); if(fb) fb.remove();
+      document.getElementById('sidebar').style.display='flex';
+      document.getElementById('main').style.display='flex';
+      applyCompanyBranding(r.company);
+      updateSidebarUser();
+      await loadDashboard();
+      showToast('Welcome to ClaimDesk, '+r.user.full_name.split(' ')[0]+'!','success');
+    } else {
+      if(msgEl) msgEl.textContent = (r&&r.error)||'Registration failed. Please try again.';
+      if(btn){ btn.textContent='Subscribe & Create Account \u2192'; btn.disabled=false; }
+    }
+  } catch(e){
+    if(msgEl) msgEl.textContent = 'Error: '+e.message;
+    if(btn){ btn.textContent='Subscribe & Create Account \u2192'; btn.disabled=false; }
+  }
+}
+
+// ── White-label branding ───────────────────────────────────────────────
+function applyCompanyBranding(company){
+  if (!company) return;
+  const name  = company.name        || 'ClaimDesk';
+  const logo  = company.logo_url    || null;
+  const color = company.brand_color || null;
+  const sbl   = document.getElementById('sidebar-logo-img');
+  const sbn   = document.getElementById('sidebar-company-name');
+  if (sbl && logo){ sbl.src=logo; sbl.alt=name; }
+  if (sbn){ sbn.textContent=name; }
+  if (color) document.documentElement.style.setProperty('--primary',color);
+  document.title = name + ' \u2014 ClaimDesk';
 }
 
 async function submitForgot(){
@@ -1639,6 +1760,7 @@ async function doLogin(){
       const fb2=document.getElementById('static-login-fallback');if(fb2)fb2.remove();
       document.getElementById('sidebar').style.display='flex';
       document.getElementById('main').style.display='flex';
+      applyCompanyBranding(r.company);
       updateSidebarUser();
       await loadDashboard();
       showToast('Welcome back, '+r.user.full_name.split(' ')[0]+'! &#x1F44B;','success');
@@ -1653,39 +1775,6 @@ async function doLogin(){
   finally{btn.textContent='Sign In ->';btn.disabled=false;}
 }
 
-async function doRegister(){
-  const company=document.getElementById('reg-company').value.trim();
-  const name=document.getElementById('reg-name').value.trim();
-  const email=document.getElementById('reg-email').value.trim();
-  const phone=document.getElementById('reg-phone').value.trim();
-  const msgEl=document.getElementById('reg-msg');
-  const btn=document.getElementById('reg-btn');
-  if(!company||!name||!email){msgEl.textContent='Company, name, and email required.';return;}
-  btn.textContent='Creating account...';btn.disabled=true;msgEl.textContent='';
-  try{
-    const r=await callFunction('authRegister',{company_name:company,owner_name:name,owner_email:email,phone});
-    if(r.ok){
-      // auto-login
-      const lr=await callFunction('authLogin',{email});
-      if(lr.ok){
-        saveSession(lr.user,lr.company);
-        document.getElementById('login-screen').remove();
-        document.getElementById('sidebar').style.display='flex';
-        document.getElementById('main').style.display='flex';
-        updateSidebarUser();
-        await loadDashboard();
-        showToast('&#x1F389; Welcome to ClaimDesk! Trial active.','success');
-        setTimeout(checkAndShowTutorial, 600);
-      }
-    }else{msgEl.textContent=r.error||'Registration failed';}
-  }catch(e){
-    let msg = e.message || 'Login failed';
-    if (msg.includes('Failed to fetch') || msg.includes('Cannot reach')) msg = 'Cannot reach ClaimDesk server. Check your connection.';
-    if (msg.includes('timed out')) msg = 'Server is slow — try again in a moment.';
-    msgEl.textContent = msg;
-  }
-  finally{btn.textContent='Start Free Trial ->';btn.disabled=false;}
-}
 
 function doLogout(){
   if(!confirm('Sign out of ClaimDesk?'))return;
