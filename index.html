@@ -5820,30 +5820,67 @@ function clearEstimate() {
 }
 
 // ─── ADD LINE FROM QUICK-ADD ─────────────────────────────────────────────────
-function addLineToEstimate() {
-  const desc  = (document.getElementById('qa-desc')?.value || '').trim();
-  const price = parseFloat(document.getElementById('qa-price')?.value) || 0;
-  const qty   = parseFloat(document.getElementById('qa-qty')?.value)   || 1;
-  const trade = document.getElementById('qa-trade')?.value || '';
-  const prodIdx = document.getElementById('qa-product')?.value;
-  const items = getCatalogItems(trade);
-  const item  = (prodIdx !== '' && items[parseInt(prodIdx)]) ? items[parseInt(prodIdx)] : null;
+// getCatalogItems — returns QA_PRODUCTS array for a given trade key
+// Resolves the ReferenceError: getCatalogItems is not defined
+function getCatalogItems(tradeKey) {
+  if (!tradeKey) return [];
+  // QA_PRODUCTS is keyed by trade value (e.g. 'roofing_shingles')
+  // tradeKey may be the raw key or the display label — try both
+  if (QA_PRODUCTS[tradeKey]) return QA_PRODUCTS[tradeKey];
+  // Fallback: match by normalizing
+  const norm = tradeKey.toLowerCase().replace(/[^a-z0-9]/g,'_');
+  for (const [k, v] of Object.entries(QA_PRODUCTS)) {
+    if (k === norm || k.replace(/[^a-z0-9]/g,'_') === norm) return v;
+  }
+  return [];
+}
 
-  if (!desc && !item) { showToast('Enter a description or select a product.', 'error'); return; }
+function addLineToEstimate(lineData) {
+  // Called EITHER with a lineData object (from addQALine) OR with no args (from direct DOM read)
+  let trade, desc, qty, unit, price, xCode, notes, product;
 
-  estLines.push({
-    trade:   item ? trade : trade,
-    product: item ? (item.brand + ' ' + item.product + (item.color ? ' ' + item.color : '')) : desc,
-    desc:    desc || (item ? (item.code ? item.code + ' — ' + item.desc : item.brand + ' ' + item.product) : ''),
-    qty,
-    unit:    document.getElementById('qa-qty')?.dataset?.unit || 'SQ',
-    price,
-    xCode:   item?.code || '',
-    notes:   '',
-  });
+  if (lineData && typeof lineData === 'object') {
+    // Called from addQALine with pre-built object
+    ({ trade='', desc='', qty=1, unit='EA', price=0, xCode='', notes='', product='' } = lineData);
+    desc = desc || product || trade || 'Item';
+  } else {
+    // Called directly — read from DOM inputs
+    trade    = document.getElementById('qa-trade')?.value || '';
+    qty      = parseFloat(document.getElementById('qa-qty')?.value)   || 1;
+    unit     = document.getElementById('qa-unit')?.value || document.getElementById('qa-qty')?.dataset?.unit || 'EA';
+    price    = parseFloat(document.getElementById('qa-price')?.value) || 0;
+    xCode    = '';
+    notes    = '';
+
+    // Try to get product from dropdown
+    const prodSel = document.getElementById('qa-product');
+    const prodName = prodSel ? prodSel.value : '';
+    const rawDesc  = (document.getElementById('qa-desc')?.value || '').trim();
+
+    // Look up the selected product in QA_PRODUCTS catalog
+    const catalogItems = getCatalogItems(trade);
+    const matchedItem  = catalogItems.find(p => p.name === prodName);
+
+    if (matchedItem) {
+      desc   = rawDesc || matchedItem.name;
+      price  = price || matchedItem.price;
+      unit   = unit  || matchedItem.unit;
+      xCode  = matchedItem.code || xCode;
+    } else {
+      desc = rawDesc || prodName || trade || 'Item';
+    }
+  }
+
+  if (!desc || desc === 'Item') { showToast('Enter a description or select a product.', 'warning'); return; }
+
+  estLines.push({ trade, desc, product: product||desc, qty, unit, price, xCode, notes: notes||'' });
   renderEstLines();
-  ['qa-desc','qa-price','qa-qty'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('qa-desc')?.focus();
+
+  // Clear inputs only when reading from DOM (no lineData arg)
+  if (!lineData) {
+    ['qa-desc','qa-price','qa-qty'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('qa-desc')?.focus();
+  }
 }
 
 // ─── PRINT: ESTIMATE/SUPPLEMENT VIEW (with Xactimate codes + notes) ──────────
