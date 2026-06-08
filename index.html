@@ -4489,7 +4489,121 @@ function openDocBuilderForJob(claimId) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
-let estLines = [];  // {trade, product, desc, qty, unit, price, xCode, notes}
+let estLines = [];
+
+// ── Randy Debug Flag ─────────────────────────────────────────────────────────
+// Set window.__EST_DEBUG = true in console to enable render/recalc telemetry
+window.__EST_DEBUG = false;
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Randy Test Harness ───────────────────────────────────────────────────────
+// Usage in browser console:
+//   __RANDY_TEST__.runAll()          → run all checks, log pass/fail
+//   __RANDY_TEST__.check('template') → run one suite
+//   window.__EST_DEBUG = true        → enable verbose render logging
+window.__RANDY_TEST__ = {
+  _pass: 0, _fail: 0,
+  assert(label, condition, detail) {
+    if (condition) {
+      this._pass++;
+      console.log('%c✅ PASS', 'color:#16a34a;font-weight:800', label, detail||'');
+    } else {
+      this._fail++;
+      console.error('❌ FAIL', label, detail||'');
+    }
+  },
+
+  check_dom() {
+    console.group('🔍 DOM Structure');
+    this.assert('#est-lines exists', !!document.getElementById('est-lines'));
+    this.assert('#est-lines-wrap exists', !!document.getElementById('est-lines-wrap'));
+    this.assert('#li-count-label exists', !!document.getElementById('li-count-label'));
+    this.assert('et-sub exists', !!document.getElementById('et-sub'));
+    this.assert('et-total exists', !!document.getElementById('et-total'));
+    this.assert('qa-trade exists', !!document.getElementById('qa-trade'));
+    this.assert('qa-product exists', !!document.getElementById('qa-product'));
+    this.assert('qa-price exists', !!document.getElementById('qa-price'));
+    this.assert('qa-qty exists', !!document.getElementById('qa-qty'));
+    console.groupEnd();
+  },
+
+  check_globals() {
+    console.group('🔍 Global Functions');
+    this.assert('estLines is array', Array.isArray(window.estLines));
+    this.assert('renderEstLines defined', typeof renderEstLines === 'function');
+    this.assert('recalcEst defined', typeof recalcEst === 'function');
+    this.assert('loadGAFTemplate defined', typeof loadGAFTemplate === 'function');
+    this.assert('addLineToEstimate defined', typeof addLineToEstimate === 'function');
+    this.assert('addQALine defined', typeof addQALine === 'function');
+    this.assert('getCatalogItems defined', typeof getCatalogItems === 'function');
+    this.assert('QA_PRODUCTS defined', typeof QA_PRODUCTS === 'object');
+    this.assert('GAF_TEMPLATES defined', typeof GAF_TEMPLATES === 'object');
+    console.groupEnd();
+  },
+
+  check_template(key) {
+    console.group('🔍 Template: ' + key);
+    const before = estLines.length;
+    loadGAFTemplate(key);
+    this.assert('estLines populated after load', estLines.length > 0, estLines.length + ' items');
+    this.assert('est-lines rendered', document.querySelectorAll('#est-lines .li-r').length > 0,
+      document.querySelectorAll('#est-lines .li-r').length + ' rows in DOM');
+    const sub = document.getElementById('et-sub');
+    this.assert('subtotal updated', sub && sub.textContent !== '--' && sub.textContent !== '', sub?.textContent);
+    console.groupEnd();
+  },
+
+  check_manual_add() {
+    console.group('🔍 Manual Line Add');
+    const before = estLines.length;
+    addLineToEstimate({ trade:'Roofing — Shingles', desc:'TEST LINE ITEM', qty:10, unit:'SQ', price:99.99, xCode:'RFG300S', notes:'' });
+    this.assert('estLines grew by 1', estLines.length === before + 1, estLines.length + ' lines');
+    this.assert('last item desc correct', estLines[estLines.length-1].desc === 'TEST LINE ITEM');
+    this.assert('last item price correct', estLines[estLines.length-1].price === 99.99);
+    const rows = document.querySelectorAll('#est-lines .li-r');
+    this.assert('DOM row count matches estLines', rows.length === estLines.length, rows.length + ' DOM rows vs ' + estLines.length + ' estLines');
+    console.groupEnd();
+  },
+
+  check_recalc() {
+    console.group('🔍 Recalc');
+    estLines = [{ trade:'Test', desc:'Item A', qty:2, unit:'SQ', price:100, xCode:'', notes:'' }];
+    renderEstLines();
+    recalcEst();
+    const sub = document.getElementById('et-sub');
+    this.assert('subtotal = $200.00', sub && sub.textContent.includes('200'), sub?.textContent);
+    const total = document.getElementById('et-total');
+    this.assert('grand total > subtotal', total && total.textContent !== '--', total?.textContent);
+    console.groupEnd();
+  },
+
+  check_catalog() {
+    console.group('🔍 Catalog (getCatalogItems)');
+    const items = getCatalogItems('roofing_shingles');
+    this.assert('roofing_shingles returns array', Array.isArray(items), items.length + ' items');
+    this.assert('items have name/unit/price', items.length > 0 && items[0].name && items[0].price, items[0]?.name);
+    const empty = getCatalogItems('nonexistent_key');
+    this.assert('unknown key returns []', Array.isArray(empty) && empty.length === 0);
+    console.groupEnd();
+  },
+
+  runAll() {
+    this._pass = 0; this._fail = 0;
+    console.group('%c🤖 Randy Test Harness — Full Suite', 'font-size:15px;font-weight:900;color:#1e6fff');
+    this.check_dom();
+    this.check_globals();
+    this.check_catalog();
+    this.check_template('hdz');
+    this.check_template('gutters');
+    this.check_manual_add();
+    this.check_recalc();
+    console.groupEnd();
+    console.log(\`%c🏁 Results: \${this._pass} passed, \${this._fail} failed\`,
+      \`font-size:14px;font-weight:800;color:\${this._fail===0?'#16a34a':'#dc2626'}\`);
+    return { pass: this._pass, fail: this._fail };
+  }
+};
+// ─────────────────────────────────────────────────────────────────────────────
+  // {trade, product, desc, qty, unit, price, xCode, notes}
 // (MO and WO lines are managed by their own existing functions below)
 
 // ─── GAF & SHINGLE SYSTEM TEMPLATES ─────────────────────────────────────────
@@ -4813,19 +4927,27 @@ const GAF_TEMPLATES = {
 function loadGAFTemplate(key) {
   if (!key) return;
   // Alias map: short button keys → actual GAF_TEMPLATES keys
+  // Central alias registry — extend here as new templates are added
   const ALIAS = {
-    'hdz':        'hdz_charcoal',   // default HDZ color
-    'cs':         'bd_chestnut',    // Camelot II CS → BoardDeck (best match)
-    'redeckonly': 'hdz_insurance',  // insurance/redeck build
-    'gutters':    'flatroof_modbit',// no standalone gutters template — use supplement fallback below
+    'hdz':        'hdz_charcoal',
+    'hdz_default':'hdz_charcoal',
+    'cs':         'bd_chestnut',
+    'camelot':    'bd_chestnut',
+    'redeckonly': 'hdz_insurance',
+    'redeck':     'hdz_insurance',
+    'insurance':  'hdz_insurance',
     'supplement': 'hdz_insurance',
     'flat':       'flatroof_modbit',
+    'modbit':     'flatroof_modbit',
+    'tpo':        'flatroof_modbit',
+    'gutters':    '__GUTTERS_INLINE__', // built inline below
   };
   const resolvedKey = ALIAS[key] || key;
+  if (window.__EST_DEBUG) console.log('[Randy] loadGAFTemplate:', key, '→', resolvedKey);
   const tpl = GAF_TEMPLATES[resolvedKey];
   if (!tpl) {
     // If still not found, try to build a minimal gutters-only template on the fly
-    if (key === 'gutters') {
+    if (key === 'gutters' || resolvedKey === '__GUTTERS_INLINE__') {
       const gutterLines = [
         { trade:'Gutters & Drainage', product:'6" K-Style Aluminum Gutter — .032 gauge', desc:'6" K-Style Seamless Aluminum Gutter — Installed', qty:120, unit:'LF', price:8.49, xCode:'GUT200', notes:'Full perimeter per SMACNA drainage standards.' },
         { trade:'Gutters & Drainage', product:'3x4 Aluminum Downspout', desc:'3×4 Rectangular Aluminum Downspouts — Installed', qty:4, unit:'EA', price:95.00, xCode:'GUT230', notes:'Min 1 per 40 LF per IRC R903.4.' },
@@ -5722,10 +5844,22 @@ function setEstMode(mode) {
 
 // ─── RENDER ESTIMATE LINE ITEMS ──────────────────────────────────────────────
 function renderEstLines() {
-  const c      = document.getElementById('est-lines');
+  let c = document.getElementById('est-lines');
+  // Defensive: auto-create container if missing (e.g. tab not yet rendered)
+  if (!c) {
+    const wrap = document.getElementById('est-lines-wrap');
+    if (wrap) {
+      wrap.innerHTML = '<div id="est-lines"></div><span id="li-count-label" style="font-size:11px;color:var(--text2);display:block;margin-top:6px;text-align:right"></span>';
+      c = document.getElementById('est-lines');
+    }
+    if (!c) {
+      if (window.__EST_DEBUG) console.warn('[Randy] #est-lines missing and could not auto-create — skipping render');
+      return;
+    }
+    if (window.__EST_DEBUG) console.info('[Randy] #est-lines auto-created from est-lines-wrap fallback');
+  }
   const cnt    = document.getElementById('li-count-label');
   const isEst  = !window._estMode || window._estMode === 'estimate';
-  if (!c) return;
 
   if (!estLines.length) {
     c.innerHTML = `<div class="li-empty"><div class="li-empty-icon">&#x1F4C4;</div><p style="font-size:13px;margin:0;color:var(--text2)">No line items yet — pick a template above or use Quick Add</p></div>`;
@@ -5806,11 +5940,13 @@ function renderEstLines() {
   }).join('');
 
   if (cnt) cnt.textContent = estLines.length + (estLines.length === 1 ? ' item' : ' items');
+  if (window.__EST_DEBUG) console.log('[Randy] renderEstLines complete — rendered', estLines.length, 'lines, mode:', window._estMode||'estimate');
   recalcEst();
 }
 
 // ─── RECALC ESTIMATE TOTALS ──────────────────────────────────────────────────
 function recalcEst() {
+  if (window.__EST_DEBUG) console.log('[Randy] recalcEst — lines:', estLines.length, '| raw data:', JSON.parse(JSON.stringify(estLines)));
   const sub = estLines.reduce((s, l) => s + (parseFloat(l.qty)||0) * (parseFloat(l.price)||0), 0);
   const el  = id => document.getElementById(id);
   const fmt = v => '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
